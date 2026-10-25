@@ -44,7 +44,7 @@
   .tabs button.on { background: rgba(79,163,255,.14); color: var(--green); }
   .tabs .n { opacity: .7; margin-left: 3px; }
 
-  .add { display: flex; align-items: center; gap: 8px; margin: 10px 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
+  .add { cursor: text; display: flex; align-items: center; gap: 8px; margin: 10px 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
   .add:focus-within { border-color: var(--accent); }
   .add span { color: var(--accent); font-weight: 800; font-size: 16px; }
   .add input { flex: 1; border: 0; outline: 0; background: none; padding: 9px 0; user-select: text; }
@@ -248,6 +248,11 @@ document.addEventListener("click", async e => {
   if (el.id === "closeBtn") { hidePopup(); return; }
 });
 
+$("#addForm").addEventListener("mousedown", e => {
+  if (e.target.closest("button, input")) return;
+  e.preventDefault();
+  $("#addInput").focus();
+});
 $("#addForm").addEventListener("submit", async e => {
   e.preventDefault();
   const inp = $("#addInput");

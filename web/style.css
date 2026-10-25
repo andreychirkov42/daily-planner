@@ -482,3 +482,7 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .head-right .btn { white-space: nowrap; }
 .main-head > div:nth-child(2) { min-width: 0; }
 @media (max-width: 900px) { .ring-wrap > div:last-child { display: none; } }
+/* строка добавления кликабельна по всей длине */
+.quick-add { cursor: text; }
+.quick-add input { align-self: stretch; padding: 10px 0; }
+.quick-add .btn { cursor: pointer; }

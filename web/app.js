@@ -1244,6 +1244,12 @@ function init() {
   applyTheme();
   $("#quickAdd").addEventListener("submit", quickAdd);
   $("#qaInput").addEventListener("input", renderPreview);
+  // клик в любом месте строки ставит курсор в поле ввода
+  $("#quickAdd").addEventListener("mousedown", e => {
+    if (e.target.closest("button, input")) return;
+    e.preventDefault();
+    $("#qaInput").focus();
+  });
 
   $("#sidebar").addEventListener("click", onSidebarClick);
   $("#addList").addEventListener("click", e => { e.stopPropagation(); showNewList(); });
