@@ -25,14 +25,18 @@ type pt struct{ x, y float64 }
 
 // variants — варианты иконки; у каждого своя функция цвета пикселя в координатах 0..1
 var variants = map[string]func(x, y, px float64) color.NRGBA{
-	"crystal": crystal, // тёмная плитка и гранёная галочка
-	"page":    page,    // тёмная плитка, листок ежедневника и галочка
-	"glow":    glow,    // синий градиент и гранёная галочка
+	"star":     star,     // гранёная четырёхлучевая звезда-ориентир
+	"bookmark": bookmark, // лента-закладка ежедневника
+	"sunrise":  sunrise,  // солнце над горизонтом — план на день
+	"layers":   layers,   // стопка карточек-задач
+	"crystal":  crystal,  // гранёная галочка (прежний вариант)
+	"page":     page,
+	"glow":     glow,
 }
-var order = []string{"crystal", "page", "glow"}
+var order = []string{"star", "bookmark", "sunrise", "layers"}
 
 func main() {
-	variant := flag.String("variant", "crystal", "вариант: crystal, page, glow")
+	variant := flag.String("variant", "star", "вариант: star, bookmark, sunrise, layers, crystal, page, glow")
 	preview := flag.String("preview", "", "сохранить лист сравнения вариантов в этот PNG")
 	flag.Parse()
 
@@ -300,6 +304,141 @@ func glow(x, y, px float64) color.NRGBA {
 	ice := [2]color.NRGBA{rgb(0xc7dcff), rgb(0x9db9f5)}
 	if cc, hit := drawCheck(c, x, y, 1, 0, 0, white, ice); hit {
 		return cc
+	}
+	return c
+}
+
+// ---------- новые символы ----------
+
+// facet красит треугольник: светлая или тёмная грань с диагональным градиентом
+func facet(x, y float64, tri []pt, light bool) (color.NRGBA, bool) {
+	if !inPoly(x, y, tri) {
+		return color.NRGBA{}, false
+	}
+	t := (x + y - 0.6) / 0.8
+	if light {
+		return lerp(lightFacet[0], lightFacet[1], t), true
+	}
+	return lerp(darkFacet[0], darkFacet[1], t), true
+}
+
+func withShadow(c color.NRGBA, x, y float64, shapes [][]pt, a float64) color.NRGBA {
+	for i, k := range []float64{0.018, 0.03, 0.045} {
+		for _, sh := range shapes {
+			if inPoly(x, y, shift(sh, 0, k)) {
+				return over(c, rgb(0x02040a), a*[]float64{1, 0.6, 0.3}[i])
+			}
+		}
+	}
+	return c
+}
+
+func star(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	o := pt{0.5, 0.5}
+	const arm, waist = 0.34, 0.085
+	n, e, s, w := pt{0.5, 0.5 - arm}, pt{0.5 + arm*0.92, 0.5}, pt{0.5, 0.5 + arm}, pt{0.5 - arm*0.92, 0.5}
+	ne, se, sw, nw := pt{0.5 + waist, 0.5 - waist}, pt{0.5 + waist, 0.5 + waist}, pt{0.5 - waist, 0.5 + waist}, pt{0.5 - waist, 0.5 - waist}
+	tris := [][]pt{{o, n, nw}, {o, n, ne}, {o, e, ne}, {o, e, se}, {o, s, se}, {o, s, sw}, {o, w, sw}, {o, w, nw}}
+	c = withShadow(c, x, y, tris, 0.55)
+	for i, tr := range tris {
+		// у каждого луча одна грань светлая, другая тёмная — как у огранённого камня
+		if cc, hit := facet(x, y, tr, i%2 == 0); hit {
+			return cc
+		}
+	}
+	return c
+}
+
+func bookmark(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	const l, r, top, bot, notch = 0.33, 0.67, 0.18, 0.82, 0.15
+	mid := (l + r) / 2
+	left := []pt{{l, top}, {mid, top}, {mid, bot - notch}, {l, bot}}
+	right := []pt{{mid, top}, {r, top}, {r, bot}, {mid, bot - notch}}
+	fold := []pt{{l, top}, {r, top}, {r, top + 0.07}, {l, top + 0.07}}
+	c = withShadow(c, x, y, [][]pt{left, right}, 0.55)
+	if inPoly(x, y, fold) {
+		return lerp(rgb(0xc4ecff), rgb(0x8cc6ff), (x-l)/(r-l))
+	}
+	if cc, hit := facet(x, y, left, true); hit {
+		return cc
+	}
+	if cc, hit := facet(x, y, right, false); hit {
+		return cc
+	}
+	return c
+}
+
+func sunrise(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	cx, hy, r := 0.5, 0.62, 0.2
+	sunTop, sunBot := rgb(0xffe08a), rgb(0xff8a3d)
+	// лучи
+	for i := 0; i < 7; i++ {
+		a := math.Pi * (0.08 + 0.84*float64(i)/6)
+		dx, dy := -math.Cos(a), -math.Sin(a)
+		in, out := r+0.05, r+0.13
+		w := 0.022
+		p := []pt{
+			{cx + dx*in - dy*w, hy + dy*in + dx*w}, {cx + dx*out, hy + dy*out}, {cx + dx*in + dy*w, hy + dy*in - dx*w},
+		}
+		if inPoly(x, y, p) {
+			return lerp(sunTop, sunBot, 0.3)
+		}
+	}
+	if y < hy && math.Hypot(x-cx, y-hy) < r {
+		return lerp(sunTop, sunBot, (y-(hy-r))/r)
+	}
+	// горизонт и отражения
+	for i, ly := range []float64{0.66, 0.72, 0.78} {
+		half := []float64{0.3, 0.2, 0.11}[i]
+		if math.Abs(y-ly) < 0.016 && math.Abs(x-cx) < half {
+			return lerp(lightFacet[0], darkFacet[1], float64(i)/2)
+		}
+	}
+	return c
+}
+
+func layers(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	rhomb := func(cy float64) []pt {
+		return []pt{{0.5, cy - 0.15}, {0.8, cy}, {0.5, cy + 0.15}, {0.2, cy}}
+	}
+	// снизу вверх: нижние слои темнее, верхний — светлая грань
+	shapes := [][]pt{rhomb(0.63), rhomb(0.5), rhomb(0.37)}
+	c = withShadow(c, x, y, shapes[:1], 0.5)
+	if inPoly(x, y, shapes[2]) {
+		// верхняя карточка: левая половина светлее
+		if x < 0.5 {
+			return lerp(lightFacet[0], lightFacet[1], (y-0.22)/0.3)
+		}
+		return lerp(rgb(0x7fb6ff), rgb(0x4f86ff), (y-0.22)/0.3)
+	}
+	// зазор между слоями
+	if inPoly(x, y, shift(shapes[2], 0, 0.035)) {
+		return c
+	}
+	if inPoly(x, y, shapes[1]) {
+		return lerp(rgb(0x3b7bff), rgb(0x2a5ce0), (x-0.2)/0.6)
+	}
+	if inPoly(x, y, shift(shapes[1], 0, 0.035)) {
+		return c
+	}
+	if inPoly(x, y, shapes[0]) {
+		return lerp(rgb(0x2448c8), rgb(0x1a2f8f), (x-0.2)/0.6)
 	}
 	return c
 }
