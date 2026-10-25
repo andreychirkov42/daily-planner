@@ -1,13 +1,17 @@
-// genicon рисует иконку приложения: assets/icon.ico (для трея и exe) и assets/icon.png.
+// genicon рисует иконку приложения: assets/icon.ico (трей и exe), assets/icon.png, web/icon.png.
 //
-//	go run ./tools/genicon
+//	go run ./tools/genicon                 иконка по умолчанию (кристалл)
+//	go run ./tools/genicon -variant=page   другой вариант
+//	go run ./tools/genicon -preview=file   лист со всеми вариантами для сравнения
 package main
 
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"log"
 	"math"
@@ -17,27 +21,77 @@ import (
 
 const ss = 4 // сглаживание: рисуем в 4 раза крупнее и усредняем
 
+type pt struct{ x, y float64 }
+
+// variants — варианты иконки; у каждого своя функция цвета пикселя в координатах 0..1
+var variants = map[string]func(x, y, px float64) color.NRGBA{
+	"crystal": crystal, // тёмная плитка и гранёная галочка
+	"page":    page,    // тёмная плитка, листок ежедневника и галочка
+	"glow":    glow,    // синий градиент и гранёная галочка
+}
+var order = []string{"crystal", "page", "glow"}
+
 func main() {
+	variant := flag.String("variant", "crystal", "вариант: crystal, page, glow")
+	preview := flag.String("preview", "", "сохранить лист сравнения вариантов в этот PNG")
+	flag.Parse()
+
+	if *preview != "" {
+		must(writePNG(*preview, sheet()))
+		log.Println("лист вариантов:", *preview)
+		return
+	}
+	fn, ok := variants[*variant]
+	if !ok {
+		log.Fatalf("нет варианта %q", *variant)
+	}
 	sizes := []int{16, 20, 24, 32, 40, 48, 64, 128, 256}
 	var pngs [][]byte
 	for _, s := range sizes {
 		var buf bytes.Buffer
-		if err := png.Encode(&buf, render(s)); err != nil {
-			log.Fatal(err)
-		}
+		must(png.Encode(&buf, render(s, fn)))
 		pngs = append(pngs, buf.Bytes())
 	}
 	must(os.MkdirAll("assets", 0o755))
 	must(os.WriteFile(filepath.Join("assets", "icon.png"), pngs[len(pngs)-1], 0o644))
 	must(os.WriteFile(filepath.Join("web", "icon.png"), pngs[len(pngs)-2], 0o644)) // 128px для страницы
 	must(os.WriteFile(filepath.Join("assets", "icon.ico"), ico(sizes, pngs), 0o644))
-	log.Println("готово: assets/icon.ico, assets/icon.png")
+	log.Printf("готово (%s): assets/icon.ico, assets/icon.png, web/icon.png", *variant)
 }
 
 func must(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func writePNG(path string, img image.Image) error {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return err
+	}
+	return os.WriteFile(path, buf.Bytes(), 0o644)
+}
+
+// sheet — все варианты в размерах 256, 48, 32, 16 на светлом и тёмном фоне
+func sheet() image.Image {
+	sizes := []int{256, 48, 32, 16}
+	w, h := 40+len(sizes)*0+256+40+48+24+32+24+16+40, 2*(256+40)+20
+	img := image.NewNRGBA(image.Rect(0, 0, w*len(order), h))
+	for vi, name := range order {
+		for row, bg := range []color.NRGBA{{0xf2, 0xf5, 0xfa, 255}, {0x0d, 0x12, 0x1b, 255}} {
+			oy := row * (256 + 40)
+			draw.Draw(img, image.Rect(vi*w, oy, (vi+1)*w, oy+256+40), &image.Uniform{bg}, image.Point{}, draw.Src)
+			x := vi*w + 20
+			for _, s := range sizes {
+				ic := render(s, variants[name])
+				y := oy + 20 + (256-s)/2
+				draw.Draw(img, image.Rect(x, y, x+s, y+s), ic, image.Point{}, draw.Over)
+				x += s + 24
+			}
+		}
+	}
+	return img
 }
 
 // ico собирает ICO-файл из PNG-картинок (поддерживается с Windows Vista).
@@ -69,59 +123,185 @@ func ico(sizes []int, pngs [][]byte) []byte {
 	return b.Bytes()
 }
 
-func render(size int) image.Image {
+// render рисует вариант в размере size со сглаживанием.
+func render(size int, fn func(x, y, px float64) color.NRGBA) image.Image {
 	n := size * ss
 	big := image.NewNRGBA(image.Rect(0, 0, n, n))
-	fn := float64(n)
-	radius := fn * 0.24
-	// галочка
-	pts := [][2]float64{{0.27, 0.53}, {0.43, 0.68}, {0.74, 0.35}}
-	stroke := fn * 0.105
-	if size <= 20 {
-		stroke = fn * 0.14 // на маленьких размерах линия толще, иначе не видно
-	}
-	for y := 0; y < n; y++ {
-		for x := 0; x < n; x++ {
-			px, py := float64(x)+0.5, float64(y)+0.5
-			if !inRoundRect(px, py, fn, radius) {
-				continue
-			}
-			// диагональный градиент от голубого к синему
-			t := (px + py) / (2 * fn)
-			c := lerp(color.NRGBA{0x3d, 0xc8, 0xff, 255}, color.NRGBA{0x24, 0x52, 0xf0, 255}, t)
-			// лёгкий блик сверху
-			if py < fn*0.5 {
-				k := (fn*0.5 - py) / (fn * 0.5) * 0.12
-				c = lerp(c, color.NRGBA{255, 255, 255, 255}, k)
-			}
-			for i := 0; i+1 < len(pts); i++ {
-				if segDist(px, py, pts[i][0]*fn, pts[i][1]*fn, pts[i+1][0]*fn, pts[i+1][1]*fn) < stroke/2 {
-					c = color.NRGBA{255, 255, 255, 255}
-				}
-			}
-			big.SetNRGBA(x, y, c)
+	px := 1 / float64(n) // размер пикселя в координатах 0..1
+	for yy := 0; yy < n; yy++ {
+		for xx := 0; xx < n; xx++ {
+			big.SetNRGBA(xx, yy, fn((float64(xx)+0.5)/float64(n), (float64(yy)+0.5)/float64(n), px*float64(ss)))
 		}
 	}
 	return downsample(big, size)
 }
 
-func inRoundRect(x, y, s, r float64) bool {
-	cx := math.Max(r, math.Min(s-r, x))
-	cy := math.Max(r, math.Min(s-r, y))
+// ---------- геометрия ----------
+
+func inRoundRect(x, y, x0, y0, x1, y1, r float64) bool {
+	cx := math.Max(x0+r, math.Min(x1-r, x))
+	cy := math.Max(y0+r, math.Min(y1-r, y))
 	return (x-cx)*(x-cx)+(y-cy)*(y-cy) <= r*r
 }
 
-func segDist(px, py, ax, ay, bx, by float64) float64 {
-	dx, dy := bx-ax, by-ay
-	t := ((px-ax)*dx + (py-ay)*dy) / (dx*dx + dy*dy)
-	t = math.Max(0, math.Min(1, t))
-	return math.Hypot(px-(ax+t*dx), py-(ay+t*dy))
+func inPoly(x, y float64, p []pt) bool {
+	in := false
+	for i, j := 0, len(p)-1; i < len(p); j, i = i, i+1 {
+		if (p[i].y > y) != (p[j].y > y) && x < (p[j].x-p[i].x)*(y-p[i].y)/(p[j].y-p[i].y)+p[i].x {
+			in = !in
+		}
+	}
+	return in
+}
+
+func shift(p []pt, dx, dy float64) []pt {
+	out := make([]pt, len(p))
+	for i, q := range p {
+		out[i] = pt{q.x + dx, q.y + dy}
+	}
+	return out
 }
 
 func lerp(a, b color.NRGBA, t float64) color.NRGBA {
 	t = math.Max(0, math.Min(1, t))
 	f := func(x, y uint8) uint8 { return uint8(float64(x) + (float64(y)-float64(x))*t) }
-	return color.NRGBA{f(a.R, b.R), f(a.G, b.G), f(a.B, b.B), 255}
+	return color.NRGBA{f(a.R, b.R), f(a.G, b.G), f(a.B, b.B), f(a.A, b.A)}
+}
+
+// over накладывает цвет c с прозрачностью a поверх base
+func over(base, c color.NRGBA, a float64) color.NRGBA {
+	c.A = base.A
+	return lerp(base, c, a)
+}
+
+func rgb(hex uint32) color.NRGBA {
+	return color.NRGBA{uint8(hex >> 16), uint8(hex >> 8), uint8(hex), 255}
+}
+
+var transparent = color.NRGBA{}
+
+// ---------- гранёная галочка ----------
+
+// Контур галочки с острыми концами и линией «ребра» посередине:
+// верхняя грань светлее, нижняя темнее — получается кристалл.
+func checkFacets(scale, ox, oy float64) (upper, lower []pt) {
+	m := func(x, y float64) pt { return pt{ox + (x-0.5)*scale + 0.5, oy + (y-0.5)*scale + 0.5} }
+	a, b, c := m(0.205, 0.555), m(0.425, 0.775), m(0.835, 0.335)
+	d, e, f := m(0.745, 0.245), m(0.425, 0.6), m(0.295, 0.468)
+	m1, jc, m2 := m(0.25, 0.5115), m(0.425, 0.6875), m(0.79, 0.29)
+	return []pt{m1, f, e, d, m2, jc}, []pt{m1, jc, m2, c, b, a}
+}
+
+func drawCheck(base color.NRGBA, x, y, scale, ox, oy float64, light, dark [2]color.NRGBA) (color.NRGBA, bool) {
+	up, lo := checkFacets(scale, ox, oy)
+	t := (x + y) / 2 // диагональный градиент вдоль галочки
+	var c color.NRGBA
+	switch {
+	case inPoly(x, y, up):
+		c = lerp(light[0], light[1], (t-0.3)/0.4)
+	case inPoly(x, y, lo):
+		c = lerp(dark[0], dark[1], (t-0.3)/0.4)
+	default:
+		return base, false
+	}
+	// блик вдоль ребра между гранями
+	ridge := math.Min(segDist(x, y, up[0], up[5]), segDist(x, y, up[5], up[4]))
+	if w := 0.007 * scale; ridge < w {
+		c = lerp(c, rgb(0xeaf6ff), 0.55*(1-ridge/w))
+	}
+	return c, true
+}
+
+func segDist(px, py float64, a, b pt) float64 {
+	dx, dy := b.x-a.x, b.y-a.y
+	t := math.Max(0, math.Min(1, ((px-a.x)*dx+(py-a.y)*dy)/(dx*dx+dy*dy)))
+	return math.Hypot(px-(a.x+t*dx), py-(a.y+t*dy))
+}
+
+func shadowOfCheck(base color.NRGBA, x, y, scale, ox, oy, a float64) color.NRGBA {
+	up, lo := checkFacets(scale, ox, oy)
+	for i, k := range []float64{0.018, 0.03, 0.045} {
+		if inPoly(x, y, shift(up, 0, k)) || inPoly(x, y, shift(lo, 0, k)) {
+			return over(base, rgb(0x02040a), a*[]float64{1, 0.6, 0.3}[i])
+		}
+	}
+	return base
+}
+
+// тёмно-синяя плитка с мягким свечением и светлой кромкой сверху
+func darkTile(x, y, px float64) (color.NRGBA, bool) {
+	const r = 0.225
+	if !inRoundRect(x, y, 0.02, 0.02, 0.98, 0.98, r) {
+		return transparent, false
+	}
+	c := lerp(rgb(0x18243f), rgb(0x0a0f1c), y)
+	// свечение за галочкой
+	d := math.Hypot(x-0.55, y-0.52)
+	c = over(c, rgb(0x2f6bff), 0.38*math.Max(0, 1-d/0.5))
+	// тонкая светлая кромка
+	if !inRoundRect(x, y, 0.02+px*1.5, 0.02+px*1.5, 0.98-px*1.5, 0.98-px*1.5, r-px*1.5) {
+		c = over(c, rgb(0x9fb8ff), 0.18+0.3*(1-y))
+	}
+	return c, true
+}
+
+var (
+	lightFacet = [2]color.NRGBA{rgb(0x9fe1ff), rgb(0x5b9bff)}
+	darkFacet  = [2]color.NRGBA{rgb(0x3b7bff), rgb(0x1d3fbf)}
+)
+
+func crystal(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	c = shadowOfCheck(c, x, y, 1, 0, 0.01, 0.55)
+	if cc, hit := drawCheck(c, x, y, 1, 0, 0, lightFacet, darkFacet); hit {
+		return cc
+	}
+	return c
+}
+
+func page(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	// листок ежедневника с колечками и линейками
+	if inRoundRect(x, y, 0.25, 0.2, 0.75, 0.8, 0.06) {
+		c = lerp(rgb(0xf4f7ff), rgb(0xd9e3f7), y)
+		for _, ly := range []float64{0.36, 0.48, 0.6} {
+			if math.Abs(y-ly) < 0.012 && x > 0.33 && x < 0.67 {
+				c = rgb(0xb9c7e3)
+			}
+		}
+	}
+	for _, ry := range []float64{0.3, 0.45, 0.6} {
+		if math.Hypot(x-0.25, y-ry) < 0.035 {
+			c = rgb(0x0f1729)
+		}
+	}
+	c = shadowOfCheck(c, x, y, 0.72, 0.14, 0.17, 0.6)
+	if cc, hit := drawCheck(c, x, y, 0.72, 0.14, 0.16, lightFacet, darkFacet); hit {
+		return cc
+	}
+	return c
+}
+
+func glow(x, y, px float64) color.NRGBA {
+	const r = 0.225
+	if !inRoundRect(x, y, 0.02, 0.02, 0.98, 0.98, r) {
+		return transparent
+	}
+	c := lerp(rgb(0x3d8bff), rgb(0x2337c9), (x+y)/2)
+	c = over(c, rgb(0xffffff), 0.16*math.Max(0, 1-math.Hypot(x-0.25, y-0.15)/0.6))
+	c = shadowOfCheck(c, x, y, 1, 0, 0.01, 0.35)
+	white := [2]color.NRGBA{rgb(0xffffff), rgb(0xeaf2ff)}
+	ice := [2]color.NRGBA{rgb(0xc7dcff), rgb(0x9db9f5)}
+	if cc, hit := drawCheck(c, x, y, 1, 0, 0, white, ice); hit {
+		return cc
+	}
+	return c
 }
 
 // downsample усредняет блоки ss×ss с учётом прозрачности.

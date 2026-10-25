@@ -578,3 +578,11 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .sk-thumb .icon-btn { position: absolute; top: 10px; right: 10px; background: var(--panel); opacity: 0; box-shadow: var(--shadow); }
 .sk-thumb:hover .icon-btn { opacity: 1; }
 @media (max-width: 760px) { .sk-group, .sk-size { border-right: 0; } .sk-title { width: 100%; } }
+
+/* ---------- тонкие полосы прокрутки в цвет темы ---------- */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink-3) 45%, transparent) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-3) 40%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--ink-3) 70%, transparent); }
+::-webkit-scrollbar-button { display: none; height: 0; }

@@ -72,6 +72,10 @@ const (
 	swRestore       = 9
 	swpNoActivate   = 0x0010
 	dwmCornerPref   = 33
+	dwmUseDarkMode  = 20
+	dwmBorderColor  = 34
+	dwmCaptionColor = 35
+	dwmTextColor    = 36
 	dwmRound        = 2
 	autostartKey    = `Software\Microsoft\Windows\CurrentVersion\Run`
 	autostartName   = "DailyPlanner"
@@ -114,6 +118,16 @@ func runApp(o appOptions) {
 	}
 
 	repairAutostart()
+	// фон WebView2 до загрузки страницы — без белой вспышки при открытии окна (ARGB)
+	if os.Getenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR") == "" {
+		os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0D121B")
+	}
+	setAppTheme = func(dark bool) {
+		appDark.Store(dark)
+		if h := mainHwnd; h != 0 {
+			applyTitleBar(h, dark)
+		}
+	}
 	a := &app{url: o.url, store: o.store, pomo: o.pomo}
 	a.pop = newPopup(a)
 	if a.pop != nil {
@@ -349,6 +363,7 @@ func (a *app) showMain(view string) {
 		mainOldProc, _, _ = pSetWindowLongPtr.Call(mainHwnd, gwlpWndProc, mainProc)
 		wv.SetSize(int(820*scale), int(560*scale), webview2.HintMin)
 		setWindowIcon(mainHwnd)
+		applyTitleBar(mainHwnd, appDark.Load())
 		wv.Navigate(a.url + "/#" + view)
 	} else if view != "" {
 		a.main.Eval(fmt.Sprintf("window.openView && openView(%q)", view))
@@ -359,6 +374,29 @@ func (a *app) showMain(view string) {
 		pShowWindow.Call(mainHwnd, swShow)
 	}
 	forceForeground(mainHwnd)
+}
+
+var appDark = func() *atomic.Bool { b := &atomic.Bool{}; b.Store(true); return b }()
+
+// applyTitleBar красит системный заголовок окна в цвет приложения (Windows 11;
+// на Windows 10 срабатывает только тёмный режим заголовка).
+func applyTitleBar(hwnd uintptr, dark bool) {
+	if pDwmSetWindowAttribute.Find() != nil {
+		return
+	}
+	set := func(attr uintptr, v uint32) {
+		pDwmSetWindowAttribute.Call(hwnd, attr, uintptr(unsafe.Pointer(&v)), 4)
+	}
+	// цвета в формате COLORREF: 0x00BBGGRR
+	caption, text, border := uint32(0x001B120D), uint32(0x00F7EDE7), uint32(0x00443024) // #0d121b, #e7edf7, #243044
+	mode := uint32(1)
+	if !dark {
+		caption, text, border, mode = 0x00FAF5F2, 0x002E2018, 0x00EFE6E0, 0 // #f2f5fa, #18202e, #e0e6ef
+	}
+	set(dwmUseDarkMode, mode)
+	set(dwmCaptionColor, caption)
+	set(dwmTextColor, text)
+	set(dwmBorderColor, border)
 }
 
 // setWindowIcon ставит окну иконку из ресурсов exe (заголовок и панель задач).

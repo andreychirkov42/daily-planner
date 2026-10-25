@@ -56,7 +56,16 @@ function applyTheme() {
   const t = safeGet("theme");
   if (t) document.documentElement.dataset.theme = t;
   else delete document.documentElement.dataset.theme;
+  reportTheme();
 }
+
+// reportTheme сообщает программе тему, чтобы заголовок окна был в цвет приложения, а не белым
+function reportTheme() {
+  const dark = document.documentElement.dataset.theme === "dark" ||
+    (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  fetch("/api/app/theme", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dark }) }).catch(() => {});
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme());
 function toggleTheme() {
   const dark = document.documentElement.dataset.theme === "dark" ||
     (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);

@@ -89,6 +89,9 @@ type appOptions struct {
 // Возвращает false, если своего окна нет и нужно открыть браузер.
 var openAppWindow func(view string) bool
 
+// setAppTheme красит заголовок окна под тему страницы (задаёт оболочка Windows).
+var setAppTheme func(dark bool)
+
 // askRunningToOpen просит уже запущенную копию показать окно вместо новой вкладки.
 func askRunningToOpen(url string) bool {
 	c := http.Client{Timeout: 2 * time.Second}
@@ -164,6 +167,16 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 		}
 		res, err := s.CreateSeries(&sr)
 		respond(w, http.StatusOK, res, err)
+	})
+	mux.HandleFunc("POST /api/app/theme", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Dark bool }
+		if !readJSON(w, r, &body) {
+			return
+		}
+		if setAppTheme != nil {
+			setAppTheme(body.Dark)
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("POST /api/app/open", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ View string }
