@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sort"
 	"sync"
 	"time"
 )
@@ -40,6 +41,18 @@ type Task struct {
 	Estimate   int        `json:"estimate"` // оценка, минуты
 	Spent      int        `json:"spent"`    // затрачено, секунды
 	TimerStart *time.Time `json:"timerStart,omitempty"`
+
+	// Что делать, если задача не выполнена к сроку
+	Carry  string `json:"carry"`  // "" — остаётся просроченной, "move" — переезжает на сегодня, "shift" — сдвигается весь план
+	Series string `json:"series"` // план, к которому относится задача (для "shift")
+}
+
+// Series — план из последовательных задач (например, курс), разложенных по дням недели.
+// Если задача плана не выполнена, оставшиеся задачи заново раскладываются начиная с сегодня.
+type Series struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	PerDay [7]int `json:"perDay"` // сколько задач в день: вс, пн, вт, ср, чт, пт, сб
 }
 
 // stopTimer прибавляет время идущего таймера к Spent.
@@ -69,6 +82,8 @@ type Data struct {
 	Lists  []*List           `json:"lists"`
 	Habits []*Habit          `json:"habits"`
 	Notes  map[string]string `json:"notes"` // дата -> заметка дня
+	Pomos  map[string]int    `json:"pomos"` // дата -> завершённых фокус-сессий
+	Series []*Series         `json:"series"`
 }
 
 type Store struct {
@@ -108,6 +123,9 @@ func defaultData() Data {
 func (s *Store) normalize() {
 	if s.data.Notes == nil {
 		s.data.Notes = map[string]string{}
+	}
+	if s.data.Pomos == nil {
+		s.data.Pomos = map[string]int{}
 	}
 	for _, h := range s.data.Habits {
 		if h.Done == nil {
@@ -475,6 +493,123 @@ func (s *Store) SetNote(date, text string) error {
 	} else {
 		s.data.Notes[date] = text
 	}
+	return s.saveLocked()
+}
+
+// ---- перенос невыполненного ----
+
+func (s *Store) CreateSeries(sr *Series) (*Series, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sr.ID == "" {
+		sr.ID = newID()
+	}
+	for i, old := range s.data.Series {
+		if old.ID == sr.ID {
+			s.data.Series[i] = sr
+			return sr, s.saveLocked()
+		}
+	}
+	s.data.Series = append(s.data.Series, sr)
+	return sr, s.saveLocked()
+}
+
+// Rollover переносит просроченные невыполненные задачи согласно их Carry.
+// Возвращает число изменённых задач.
+func (s *Store) Rollover(now time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	day := now.Format("2006-01-02")
+	changed := 0
+	replan := map[string]bool{}
+	for _, t := range s.data.Tasks {
+		if t.Done || t.Due == "" || t.Due >= day {
+			continue
+		}
+		switch {
+		case t.Carry == "move" || (t.Carry == "shift" && s.seriesLocked(t.Series) == nil):
+			t.Due = day
+			changed++
+		case t.Carry == "shift":
+			replan[t.Series] = true
+		}
+	}
+	for id := range replan {
+		changed += s.replanLocked(s.seriesLocked(id), now)
+	}
+	if changed == 0 {
+		return 0, nil
+	}
+	return changed, s.saveLocked()
+}
+
+func (s *Store) seriesLocked(id string) *Series {
+	for _, sr := range s.data.Series {
+		if sr.ID == id {
+			return sr
+		}
+	}
+	return nil
+}
+
+// replanLocked раскладывает невыполненные задачи плана по дням начиная с сегодня,
+// сохраняя их порядок; задачи, уже сделанные сегодня, занимают сегодняшние места.
+func (s *Store) replanLocked(sr *Series, now time.Time) int {
+	day := now.Format("2006-01-02")
+	var todo []*Task
+	doneToday := 0
+	for _, t := range s.data.Tasks {
+		if t.Series != sr.ID {
+			continue
+		}
+		if !t.Done {
+			todo = append(todo, t)
+		} else if t.CompletedAt != nil && t.CompletedAt.Format("2006-01-02") == day {
+			doneToday++
+		}
+	}
+	total := 0
+	for _, n := range sr.PerDay {
+		total += n
+	}
+	if len(todo) == 0 || total == 0 {
+		return 0
+	}
+	sort.SliceStable(todo, func(i, j int) bool {
+		if todo[i].Due != todo[j].Due {
+			return todo[i].Due < todo[j].Due
+		}
+		return todo[i].Order < todo[j].Order
+	})
+	d := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	free := sr.PerDay[d.Weekday()] - doneToday
+	changed := 0
+	for _, t := range todo {
+		for free <= 0 {
+			d = d.AddDate(0, 0, 1)
+			free = sr.PerDay[d.Weekday()]
+		}
+		if due := d.Format("2006-01-02"); t.Due != due {
+			t.Due = due
+			changed++
+		}
+		free--
+	}
+	return changed
+}
+
+// ---- помодоро ----
+
+func (s *Store) PomoCount(date string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.data.Pomos[date]
+}
+
+func (s *Store) AddPomo(date string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data.Pomos[date]++
 	return s.saveLocked()
 }
 

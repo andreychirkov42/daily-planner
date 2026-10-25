@@ -73,3 +73,46 @@ function parseQuick(raw, lists = []) {
   return out;
 }
 
+
+/* ================= помодоро: состояние живёт на сервере, окна только показывают его ================= */
+const POMO_NAMES = { work: "Фокус", short: "Перерыв", long: "Длинный перерыв" };
+
+function fmtMMSS(sec) {
+  return `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+// pomoClient опрашивает сервер и зовёт onChange каждые полсекунды, onFinish — когда сессия закончилась.
+function pomoClient(onChange, onFinish) {
+  let st = null, lastFinished = null;
+  async function call(body) {
+    try {
+      const r = await fetch("/api/pomodoro", body ? {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      } : undefined);
+      if (r.ok) apply(await r.json());
+    } catch { /* сервер перезапускается — попробуем позже */ }
+  }
+  function apply(n) {
+    if (lastFinished !== null && n.finishedAt && n.finishedAt !== lastFinished && onFinish) onFinish(n);
+    lastFinished = n.finishedAt || 0;
+    st = n;
+    onChange(st);
+  }
+  const left = () => (!st ? 0 : st.running ? Math.max(0, Math.ceil((st.endAt - Date.now()) / 1000)) : st.left);
+  setInterval(() => call(), 2000);
+  setInterval(() => st && onChange(st), 500);
+  call();
+  return {
+    state: () => st,
+    left,
+    progress: () => (st ? 1 - left() / st.durations[st.mode] : 0),
+    toggle: label => call({ action: st && st.running ? "pause" : "start", label: label || "" }),
+    start: label => call({ action: "start", label: label || "" }),
+    reset: () => call({ action: "reset" }),
+    skip: () => call({ action: "skip" }),
+    mode: (mode, label) => call({ action: "mode", mode, label: label || "" }),
+    refresh: () => call(),
+  };
+}
+
+const TRASH_SVG = `<svg class="ico-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12a2 2 0 0 0 2 1.8h7a2 2 0 0 0 2-1.8l1-12M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7"/></svg>`;

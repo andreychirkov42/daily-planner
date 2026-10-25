@@ -23,7 +23,7 @@ import (
 var iconICO []byte
 
 // Размер мини-панели в «логических» пикселях (при 100% масштабе).
-const popupW, popupH = 380, 600
+const popupW, popupH = 380, 680
 
 func init() {
 	// окно WebView2 и иконка трея должны жить в главном потоке ОС
@@ -42,6 +42,9 @@ var (
 	pAttachThreadInput             = user32.NewProc("AttachThreadInput")
 	pBringWindowToTop              = user32.NewProc("BringWindowToTop")
 	pSendMessage                   = user32.NewProc("SendMessageW")
+	pCallWindowProc                = user32.NewProc("CallWindowProcW")
+	pIsIconic                      = user32.NewProc("IsIconic")
+	pExtractIconEx                 = windows.NewLazySystemDLL("shell32.dll").NewProc("ExtractIconExW")
 	pGetCursorPos                  = user32.NewProc("GetCursorPos")
 	pMonitorFromPoint              = user32.NewProc("MonitorFromPoint")
 	pGetMonitorInfo                = user32.NewProc("GetMonitorInfoW")
@@ -62,6 +65,12 @@ const (
 	swpShowWindow   = 0x0040
 	swpFrameChanged = 0x0020
 	wmSize          = 0x0005
+	wmClose         = 0x0010
+	wmSetIcon       = 0x0080
+	gwlpWndProc     = ^uintptr(3) // -4
+	swShow          = 5
+	swRestore       = 9
+	swpNoActivate   = 0x0010
 	dwmCornerPref   = 33
 	dwmRound        = 2
 	autostartKey    = `Software\Microsoft\Windows\CurrentVersion\Run`
@@ -79,42 +88,71 @@ type monitorInfo struct {
 }
 
 type popup struct {
-	wv       webview2.WebView
-	hwnd     uintptr
-	visible  atomic.Bool
-	hiddenAt atomic.Int64
-	shownAt  atomic.Int64
+	wv        webview2.WebView
+	hwnd      uintptr
+	visible   atomic.Bool
+	passive   atomic.Bool // показана сама (сигнал таймера), без перехвата фокуса
+	activated atomic.Bool
+	hiddenAt  atomic.Int64
+	shownAt   atomic.Int64
+}
+
+// app связывает иконку в трее, мини-панель и окно ежедневника.
+type app struct {
+	url   string
+	store *Store
+	pomo  *Pomodoro
+	pop   *popup
+	main  webview2.WebView
 }
 
 // runApp показывает иконку в трее и блокируется до выхода из программы.
-func runApp(url string, s *Store, showPopup bool) {
+func runApp(o appOptions) {
 	// чёткий текст на экранах с масштабом 125–200%
 	if pSetProcessDpiAwarenessContext.Find() == nil {
 		pSetProcessDpiAwarenessContext.Call(^uintptr(3)) // PER_MONITOR_AWARE_V2 (-4)
 	}
 
 	repairAutostart()
-	p := newPopup(url)
-	systray.Register(func() { onTrayReady(url, s, p) }, func() {
-		if p != nil {
-			p.wv.Terminate()
+	a := &app{url: o.url, store: o.store, pomo: o.pomo}
+	a.pop = newPopup(a)
+	if a.pop != nil {
+		// все обращения к окнам — только из главного потока, через очередь панели
+		openAppWindow = func(view string) bool {
+			a.pop.wv.Dispatch(func() { a.showMain(view) })
+			return true
+		}
+		o.pomo.onFinish = func(_, _ string) { a.pop.wv.Dispatch(a.pop.showAtTray) }
+	}
+	systray.Register(a.onTrayReady, func() {
+		if a.pop != nil {
+			a.pop.wv.Terminate()
 		}
 	})
-	if p != nil {
-		if showPopup {
-			// даём странице загрузиться, чтобы не мигнуть пустым окном
-			time.AfterFunc(1200*time.Millisecond, func() { p.wv.Dispatch(p.show) })
+	if a.pop == nil {
+		if o.showMain {
+			openBrowser(o.url)
 		}
-		p.wv.Run() // общий цикл сообщений для окна и иконки трея
+		runMessageLoop()
 		return
 	}
-	runMessageLoop()
+	if o.showPopup {
+		// даём странице загрузиться, чтобы не мигнуть пустым окном
+		time.AfterFunc(1200*time.Millisecond, func() { a.pop.wv.Dispatch(a.pop.show) })
+	}
+	if o.showMain {
+		time.AfterFunc(200*time.Millisecond, func() { a.pop.wv.Dispatch(func() { a.showMain("") }) })
+	}
+	a.pop.wv.Run() // общий цикл сообщений для окон и иконки трея
 }
 
-func newPopup(url string) *popup {
-	dataDir := filepath.Join(os.Getenv("LOCALAPPDATA"), "DailyPlanner", "webview")
+func webviewDataDir() string {
+	return filepath.Join(os.Getenv("LOCALAPPDATA"), "DailyPlanner", "webview")
+}
+
+func newPopup(a *app) *popup {
 	wv := webview2.NewWithOptions(webview2.WebViewOptions{
-		DataPath:  dataDir,
+		DataPath:  webviewDataDir(),
 		AutoFocus: true,
 		// окно создаётся видимым — делаем его 1×1, чтобы при запуске ничего не мигало;
 		// настоящий размер выставляется при показе панели
@@ -135,24 +173,31 @@ func newPopup(url string) *popup {
 	}
 
 	_ = wv.Bind("hidePopup", func() { p.hide() })
-	_ = wv.Bind("openMain", func(view string) {
+	_ = wv.Bind("openMain", func(view string) { a.showMain(view) })
+	_ = wv.Bind("openInBrowser", func(view string) {
 		p.hide()
-		target := url
-		if view != "" {
-			target += "/#" + view
-		}
-		openBrowser(target)
+		openBrowser(a.url + "/#" + view)
 	})
 	_ = wv.Bind("quitApp", func() { systray.Quit() })
-	wv.Navigate(url + "/popup.html")
+	wv.Navigate(a.url + "/popup.html")
 
 	// прячем панель, когда она теряет фокус (клик мимо)
 	go func() {
 		for range time.Tick(120 * time.Millisecond) {
-			if !p.visible.Load() || time.Since(time.UnixMilli(p.shownAt.Load())) < 400*time.Millisecond {
+			if !p.visible.Load() {
 				continue
 			}
-			if fg, _, _ := pGetForegroundWindow.Call(); fg != p.hwnd {
+			since := time.Since(time.UnixMilli(p.shownAt.Load()))
+			fg, _, _ := pGetForegroundWindow.Call()
+			switch {
+			case fg == p.hwnd:
+				p.activated.Store(true)
+			case p.passive.Load() && !p.activated.Load():
+				// панель от таймера висит 20 секунд, пока её не тронут
+				if since > 20*time.Second {
+					wv.Dispatch(p.hide)
+				}
+			case since > 400*time.Millisecond:
 				wv.Dispatch(p.hide)
 			}
 		}
@@ -161,7 +206,7 @@ func newPopup(url string) *popup {
 }
 
 func (p *popup) toggle() {
-	if p.visible.Load() {
+	if p.visible.Load() && !p.passive.Load() {
 		p.hide()
 		return
 	}
@@ -172,21 +217,31 @@ func (p *popup) toggle() {
 	p.show()
 }
 
+// show открывает панель у курсора (клик по иконке в трее) и делает её активной.
 func (p *popup) show() {
 	var pt point
 	pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+	p.place(pt, false)
+}
+
+// showAtTray показывает панель у края основного монитора, не отбирая фокус (сигнал таймера).
+func (p *popup) showAtTray() {
+	if p.visible.Load() {
+		p.wv.Eval("window.onPopupShow && onPopupShow()")
+		return
+	}
+	mon, _, _ := pMonitorFromPoint.Call(0, 1) // MONITOR_DEFAULTTOPRIMARY
+	mi := monitorInfo{Size: uint32(unsafe.Sizeof(monitorInfo{}))}
+	pGetMonitorInfo.Call(mon, uintptr(unsafe.Pointer(&mi)))
+	p.place(point{mi.Work.Right - 1, mi.Work.Bottom - 1}, true)
+}
+
+func (p *popup) place(pt point, passive bool) {
 	mon, _, _ := pMonitorFromPoint.Call(uintptr(*(*uint64)(unsafe.Pointer(&pt))), 2) // MONITOR_DEFAULTTONEAREST
 	mi := monitorInfo{Size: uint32(unsafe.Sizeof(monitorInfo{}))}
 	pGetMonitorInfo.Call(mon, uintptr(unsafe.Pointer(&mi)))
 
-	// масштаб берём у монитора, на котором откроется панель
-	scale := 1.0
-	var dpiX, dpiY uint32
-	if pGetDpiForMonitor.Find() == nil {
-		if r, _, _ := pGetDpiForMonitor.Call(mon, 0, uintptr(unsafe.Pointer(&dpiX)), uintptr(unsafe.Pointer(&dpiY))); r == 0 && dpiX > 0 {
-			scale = float64(dpiX) / 96
-		}
-	}
+	scale := monitorScale(mon)
 	w, h, m := int32(popupW*scale), int32(popupH*scale), int32(12*scale)
 	wa := mi.Work
 	if h > wa.Bottom-wa.Top-2*m {
@@ -197,13 +252,31 @@ func (p *popup) show() {
 	if pt.Y < wa.Top { // панель задач сверху
 		y = wa.Top + m
 	}
-	pSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(x), uintptr(y), uintptr(w), uintptr(h), swpShowWindow|swpFrameChanged)
+	flags := uintptr(swpShowWindow | swpFrameChanged)
+	if passive {
+		flags |= swpNoActivate
+	}
+	pSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(x), uintptr(y), uintptr(w), uintptr(h), flags)
 	// после смены стиля окна размер мог не измениться, и WebView не узнает о новой клиентской области
 	pSendMessage.Call(p.hwnd, wmSize, 0, 0)
-	forceForeground(p.hwnd)
+	p.passive.Store(passive)
+	p.activated.Store(false)
+	if !passive {
+		forceForeground(p.hwnd)
+	}
 	p.visible.Store(true)
 	p.shownAt.Store(time.Now().UnixMilli())
 	p.wv.Eval("window.onPopupShow && onPopupShow()")
+}
+
+func monitorScale(mon uintptr) float64 {
+	var dpiX, dpiY uint32
+	if pGetDpiForMonitor.Find() == nil {
+		if r, _, _ := pGetDpiForMonitor.Call(mon, 0, uintptr(unsafe.Pointer(&dpiX)), uintptr(unsafe.Pointer(&dpiY))); r == 0 && dpiX > 0 {
+			return float64(dpiX) / 96
+		}
+	}
+	return 1
 }
 
 // forceForeground делает окно активным. Windows разрешает это не всегда,
@@ -231,17 +304,86 @@ func (p *popup) hide() {
 	p.hiddenAt.Store(time.Now().UnixMilli())
 }
 
-func onTrayReady(url string, s *Store, p *popup) {
+// ---- окно ежедневника: одно на всё приложение, вместо новых вкладок браузера ----
+
+var (
+	mainHwnd    uintptr
+	mainOldProc uintptr
+	mainProc    = windows.NewCallback(mainWndProc)
+)
+
+// mainWndProc прячет окно по крестику вместо закрытия: иначе завершилась бы вся программа.
+func mainWndProc(hwnd, msg, wp, lp uintptr) uintptr {
+	if msg == wmClose && hwnd == mainHwnd {
+		pShowWindow.Call(hwnd, swHide)
+		return 0
+	}
+	r, _, _ := pCallWindowProc.Call(mainOldProc, hwnd, msg, wp, lp)
+	return r
+}
+
+func (a *app) showMain(view string) {
+	a.pop.hide()
+	if a.main == nil {
+		var pt point
+		pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+		mon, _, _ := pMonitorFromPoint.Call(uintptr(*(*uint64)(unsafe.Pointer(&pt))), 2)
+		scale := monitorScale(mon)
+		wv := webview2.NewWithOptions(webview2.WebViewOptions{
+			DataPath:      webviewDataDir(),
+			AutoFocus:     true,
+			WindowOptions: webview2.WindowOptions{Title: "Ежедневник", Width: uint(1280 * scale), Height: uint(840 * scale), Center: true},
+		})
+		if wv == nil {
+			openBrowser(a.url + "/#" + view)
+			return
+		}
+		a.main = wv
+		mainHwnd = uintptr(wv.Window())
+		mainOldProc, _, _ = pSetWindowLongPtr.Call(mainHwnd, gwlpWndProc, mainProc)
+		wv.SetSize(int(820*scale), int(560*scale), webview2.HintMin)
+		setWindowIcon(mainHwnd)
+		wv.Navigate(a.url + "/#" + view)
+	} else if view != "" {
+		a.main.Eval(fmt.Sprintf("window.openView && openView(%q)", view))
+	}
+	if r, _, _ := pIsIconic.Call(mainHwnd); r != 0 {
+		pShowWindow.Call(mainHwnd, swRestore)
+	} else {
+		pShowWindow.Call(mainHwnd, swShow)
+	}
+	forceForeground(mainHwnd)
+}
+
+// setWindowIcon ставит окну иконку из ресурсов exe (заголовок и панель задач).
+func setWindowIcon(hwnd uintptr) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	path, _ := windows.UTF16PtrFromString(exe)
+	var large, small uintptr
+	pExtractIconEx.Call(uintptr(unsafe.Pointer(path)), 0, uintptr(unsafe.Pointer(&large)), uintptr(unsafe.Pointer(&small)), 1)
+	if large != 0 {
+		pSendMessage.Call(hwnd, wmSetIcon, 1, large)
+	}
+	if small != 0 {
+		pSendMessage.Call(hwnd, wmSetIcon, 0, small)
+	}
+}
+
+func (a *app) onTrayReady() {
 	systray.SetIcon(iconICO)
 	systray.SetTitle("Ежедневник")
 	systray.SetTooltip("Ежедневник")
-	if p != nil {
-		systray.SetOnTapped(func() { p.wv.Dispatch(p.toggle) })
+	if a.pop != nil {
+		systray.SetOnTapped(func() { a.pop.wv.Dispatch(a.pop.toggle) })
 	} else {
-		systray.SetOnTapped(func() { openBrowser(url) })
+		systray.SetOnTapped(func() { openBrowser(a.url) })
 	}
 
-	mOpen := systray.AddMenuItem("Открыть ежедневник", "Открыть в браузере")
+	mOpen := systray.AddMenuItem("Открыть ежедневник", "Окно программы")
+	mBrowser := systray.AddMenuItem("Открыть в браузере", "")
 	mAuto := systray.AddMenuItemCheckbox("Запускать вместе с Windows", "", autostartEnabled())
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Выход", "Закрыть программу")
@@ -250,7 +392,11 @@ func onTrayReady(url string, s *Store, p *popup) {
 		for {
 			select {
 			case <-mOpen.ClickedCh:
-				openBrowser(url)
+				if openAppWindow == nil || !openAppWindow("") {
+					openBrowser(a.url)
+				}
+			case <-mBrowser.ClickedCh:
+				openBrowser(a.url)
 			case <-mAuto.ClickedCh:
 				if err := setAutostart(!mAuto.Checked()); err != nil {
 					log.Printf("автозапуск: %v", err)
@@ -268,17 +414,25 @@ func onTrayReady(url string, s *Store, p *popup) {
 		}
 	}()
 
-	// подсказка на иконке: сколько задач осталось на сегодня
+	// подсказка на иконке: таймер, если идёт, иначе задачи на сегодня
 	go func() {
-		for {
-			systray.SetTooltip(trayTooltip(s))
-			time.Sleep(30 * time.Second)
+		last := ""
+		for range time.Tick(time.Second) {
+			if tip := trayTooltip(a.store, a.pomo); tip != last {
+				systray.SetTooltip(tip)
+				last = tip
+			}
 		}
 	}()
 }
 
-func trayTooltip(s *Store) string {
-	today := time.Now().Format("2006-01-02")
+func trayTooltip(s *Store, pomo *Pomodoro) string {
+	if st := pomo.State(); st.Running {
+		left := max(0, int((st.EndAt-time.Now().UnixMilli()+999)/1000))
+		name := map[string]string{"work": "🍅 Фокус", "short": "☕ Перерыв", "long": "🌿 Длинный перерыв"}[st.Mode]
+		return fmt.Sprintf("%s %02d:%02d · Ежедневник", name, left/60, left%60)
+	}
+	today := today()
 	left, late := 0, 0
 	for _, t := range s.Tasks() {
 		switch {

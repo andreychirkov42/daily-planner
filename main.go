@@ -37,9 +37,9 @@ func main() {
 	url := "http://" + *addr
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
-		// порт занят — скорее всего ежедневник уже запущен, просто открываем его
+		// порт занят — скорее всего ежедневник уже запущен: просим его показать своё окно
 		log.Printf("порт %s занят (%v), ежедневник уже запущен", *addr, err)
-		if !*autostart {
+		if !*autostart && !askRunningToOpen(url) {
 			openBrowser(url)
 		}
 		return
@@ -49,21 +49,55 @@ func main() {
 	if err != nil {
 		log.Fatalf("не удалось открыть %s: %v", *dataPath, err)
 	}
+	pomo := NewPomodoro(store)
+	// раз в минуту переносим невыполненное (и сразу после полуночи, и при старте)
+	go func() {
+		for {
+			if n, err := store.Rollover(time.Now()); err != nil {
+				log.Printf("перенос задач: %v", err)
+			} else if n > 0 {
+				log.Printf("перенесено задач: %d", n)
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
 
 	static, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
 	mux.Handle("GET /", http.FileServerFS(static))
-	registerAPI(mux, store)
+	registerAPI(mux, store, pomo)
 
 	log.Printf("Ежедневник запущен: %s, данные: %s", url, *dataPath)
 	go func() { log.Fatal(http.Serve(ln, guard(logRequests(mux)))) }()
-	if !*noOpen && !*autostart {
-		go func() { time.Sleep(300 * time.Millisecond); openBrowser(url) }()
-	}
 	if *noTray {
+		if !*noOpen {
+			go func() { time.Sleep(300 * time.Millisecond); openBrowser(url) }()
+		}
 		select {}
 	}
-	runApp(url, store, *showPopup)
+	runApp(appOptions{url: url, store: store, pomo: pomo, showPopup: *showPopup, showMain: !*noOpen && !*autostart})
+}
+
+type appOptions struct {
+	url                 string
+	store               *Store
+	pomo                *Pomodoro
+	showPopup, showMain bool
+}
+
+// openAppWindow показывает окно ежедневника (задаёт оболочка с иконкой в трее).
+// Возвращает false, если своего окна нет и нужно открыть браузер.
+var openAppWindow func(view string) bool
+
+// askRunningToOpen просит уже запущенную копию показать окно вместо новой вкладки.
+func askRunningToOpen(url string) bool {
+	c := http.Client{Timeout: 2 * time.Second}
+	r, err := c.Post(url+"/api/app/open", "application/json", strings.NewReader(`{"view":""}`))
+	if err != nil {
+		return false
+	}
+	r.Body.Close()
+	return r.StatusCode == http.StatusNoContent
 }
 
 // defaultDataPath кладёт data.json рядом с exe, чтобы данные не зависели от папки запуска.
@@ -87,7 +121,46 @@ func setupLog(path string) {
 	log.SetOutput(io.MultiWriter(f, os.Stderr))
 }
 
-func registerAPI(mux *http.ServeMux, s *Store) {
+func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
+	mux.HandleFunc("GET /api/pomodoro", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, pomo.State())
+	})
+	mux.HandleFunc("POST /api/pomodoro", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Action, Mode, Label string }
+		if !readJSON(w, r, &body) {
+			return
+		}
+		st, err := pomo.Do(body.Action, body.Mode, body.Label)
+		if err != nil {
+			httpError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, st)
+	})
+	mux.HandleFunc("POST /api/series", func(w http.ResponseWriter, r *http.Request) {
+		var sr Series
+		if !readJSON(w, r, &sr) {
+			return
+		}
+		if sr.Name == "" {
+			httpError(w, http.StatusBadRequest, "нужно название плана")
+			return
+		}
+		res, err := s.CreateSeries(&sr)
+		respond(w, http.StatusOK, res, err)
+	})
+	mux.HandleFunc("POST /api/app/open", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ View string }
+		if !readJSON(w, r, &body) {
+			return
+		}
+		if openAppWindow == nil || !openAppWindow(body.View) {
+			httpError(w, http.StatusNotFound, "окно недоступно")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	// всё состояние одним запросом — фронтенду так проще
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.Snapshot())

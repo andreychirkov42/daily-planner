@@ -3,7 +3,8 @@
 package main
 
 // runApp на других системах просто держит сервер запущенным.
-func runApp(url string, s *Store, _ bool) {
+func runApp(o appOptions) {
+	url := o.url
 	openBrowser(url)
 	select {}
 }

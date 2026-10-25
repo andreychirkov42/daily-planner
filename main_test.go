@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -76,6 +77,38 @@ func TestTimerAccumulatesAndIsExclusive(t *testing.T) {
 	res, _ := s.UpdateTask(a.ID, &upd)
 	if res.Spent == 99999 {
 		t.Fatal("UpdateTask не должен менять Spent")
+	}
+}
+
+func TestRolloverMoveAndShift(t *testing.T) {
+	s := newTestStore(t)
+	// воскресенье 25.10.2026; план: пн 1, вт 2, ср 2, чт 1, пт 1, сб 0, вс 1
+	sr, _ := s.CreateSeries(&Series{Name: "Курс", PerDay: [7]int{1, 1, 2, 2, 1, 1, 0}})
+	chore, _ := s.CreateTask(&Task{Title: "Полить цветы", Due: "2026-10-23", Carry: "move"})
+	stay, _ := s.CreateTask(&Task{Title: "Просрочка", Due: "2026-10-23"})
+	dues := []string{"2026-10-24", "2026-10-26", "2026-10-27", "2026-10-27", "2026-10-28"}
+	var lessons []*Task
+	for i, d := range dues {
+		l, _ := s.CreateTask(&Task{Title: fmt.Sprint("Урок ", i), Due: d, Carry: "shift", Series: sr.ID})
+		lessons = append(lessons, l)
+	}
+	now := time.Date(2026, 10, 26, 9, 0, 0, 0, time.Local) // понедельник
+	if _, err := s.Rollover(now); err != nil {
+		t.Fatal(err)
+	}
+	get := func(id string) *Task { _, tk := s.findTask(id); return tk }
+	if get(chore.ID).Due != "2026-10-26" {
+		t.Errorf("move: срок %s, ожидали перенос на сегодня", get(chore.ID).Due)
+	}
+	if get(stay.ID).Due != "2026-10-23" {
+		t.Error("задача без переноса не должна двигаться")
+	}
+	// пропущенный урок встаёт на сегодня, остальные сдвигаются по сетке, суббота пустая
+	want := []string{"2026-10-26", "2026-10-27", "2026-10-27", "2026-10-28", "2026-10-28"}
+	for i, l := range lessons {
+		if got := get(l.ID).Due; got != want[i] {
+			t.Errorf("урок %d: %s, ожидали %s", i, got, want[i])
+		}
 	}
 }
 

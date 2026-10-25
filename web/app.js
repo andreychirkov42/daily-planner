@@ -17,6 +17,16 @@ const S = {
 const PALETTE = ["#7c6cf2", "#2fb59a", "#f2a33c", "#e2534a", "#4a9df0", "#d45fb8", "#8a9a5b", "#5bc0de"];
 const PRI_NAMES = ["Нет", "Низкий", "Средний", "Высокий"];
 const REPEAT_NAMES = { "": "Не повторять", daily: "Каждый день", weekdays: "По будням", weekly: "Каждую неделю", monthly: "Каждый месяц", yearly: "Каждый год" };
+const CARRY_NAMES = { "": "Остаётся просроченной", move: "Переносится на сегодня", shift: "Сдвигается весь план" };
+function seriesOf(t) { return (S.series || []).find(x => x.id === t.series); }
+function carryHint(t) {
+  const sr = seriesOf(t);
+  const days = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+  if (t.carry === "shift" && sr) return `План «${esc(sr.name)}»: ${[1, 2, 3, 4, 5, 6, 0].map(d => days[d] + " " + sr.perDay[d]).join(", ")}. Пропущенная задача встаёт на сегодня, остальные сдвигаются по сетке.`;
+  if (t.carry === "move") return "Каждый новый день невыполненная задача сама переезжает на сегодня.";
+  if (sr) return `Задача из плана «${esc(sr.name)}» — можно включить сдвиг всего плана.`;
+  return "Сдвиг плана доступен для задач из плана (например, курса).";
+}
 const VIEW_KEYS = ["today", "upcoming", "inbox", "all", "board", "schedule", "calendar", "matrix", "habits"];
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -135,7 +145,10 @@ async function load() {
   S.lists = d.lists || [];
   S.habits = d.habits || [];
   S.notes = d.notes || {};
-  S.tasks.forEach(t => S.enter.add(t.id));
+  S.series = d.series || [];
+  S.pomos = d.pomos || {};
+  if (!S.loaded) S.tasks.forEach(t => S.enter.add(t.id)); // анимация появления только при первой загрузке
+  S.loaded = true;
   render();
 }
 
@@ -325,6 +338,7 @@ function taskHTML(t, opts = {}) {
     meta.push(`<span class="chip ${t.done ? "" : cls}">📅 ${humanDate(t.due)}${t.dueTime ? " · " + t.dueTime : ""}</span>`);
   }
   if (t.repeat) meta.push(`<span class="chip" title="${REPEAT_NAMES[t.repeat]}">🔁</span>`);
+  if (t.carry && !t.done) meta.push(`<span class="chip" title="${CARRY_NAMES[t.carry]}">${t.carry === "shift" ? "⇉" : "↪"}</span>`);
   if (t.subtasks.length) meta.push(`<span class="chip">☑ ${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}</span>`);
   if (l && !opts.hideList) meta.push(`<span class="chip"><i class="dot" style="background:${l.color};margin:0"></i>${esc(l.name)}</span>`);
   for (const g of t.tags) meta.push(`<button class="chip tag" data-view="tag:${esc(g)}">#${esc(g)}</button>`);
@@ -348,7 +362,7 @@ function taskHTML(t, opts = {}) {
     <div class="t-actions">
       ${t.done ? "" : `<button class="icon-btn ${t.timerStart ? "on" : ""}" data-act="timer" title="Учёт времени">${t.timerStart ? "⏸" : "▶"}</button>`}
       <button class="icon-btn" data-act="pin" title="${t.pinned ? "Открепить" : "Закрепить"}">📌</button>
-      <button class="icon-btn" data-act="del" title="Удалить">🗑</button>
+      <button class="icon-btn" data-act="del" title="Удалить">${TRASH_SVG}</button>
     </div>
   </div>`;
 }
@@ -644,7 +658,7 @@ function viewHabits() {
       <td class="streak">🔥 ${streak(h)}</td>
       <td><div class="heat">${last30.map(d => `<i style="${h.done[d] ? `background:${h.color}` : ""}" title="${d}"></i>`).join("")}</div>
         <span style="font-size:11px;color:var(--ink-3)">${rate}%</span></td>
-      <td><button class="icon-btn" data-del-habit="${h.id}" title="Удалить">🗑</button></td></tr>`;
+      <td><button class="icon-btn" data-del-habit="${h.id}" title="Удалить">${TRASH_SVG}</button></td></tr>`;
   }
   html += `</tbody></table>${S.habits.length ? "" : empty("🌱", "Добавь привычку, которую хочешь выработать: зарядка, чтение, вода…")}</div>
     <form class="add-habit" id="addHabit"><input class="input" name="name" placeholder="Новая привычка, напр. «Читать 20 минут»" required>
@@ -666,7 +680,7 @@ function viewStats() {
   const weekTotal = perDay.reduce((a, b) => a + b, 0);
   const a = active();
   const all = S.tasks.length;
-  const pomos = +(safeGet("pomo:" + td) || 0);
+  const pomos = (S.pomos || {})[td] || 0;
 
   const cards = [
     ["Сегодня", perDay[6], "задач выполнено"],
@@ -709,7 +723,7 @@ function renderDetail() {
       <span class="grow"></span>
       <button class="icon-btn" data-d="focus" title="Фокус-сессия на эту задачу">🍅</button>
       <button class="icon-btn" data-d="pin" title="Закрепить">${t.pinned ? "📍" : "📌"}</button>
-      <button class="icon-btn" data-d="delete" title="Удалить">🗑</button>
+      <button class="icon-btn" data-d="delete" title="Удалить">${TRASH_SVG}</button>
       <button class="icon-btn" data-d="close" title="Закрыть (Esc)">✕</button>
     </div>
     <textarea class="d-title" rows="1" data-f="title">${esc(t.title)}</textarea>
@@ -748,6 +762,11 @@ function renderDetail() {
         ${Object.entries(REPEAT_NAMES).map(([k, n]) => `<option value="${k}" ${t.repeat === k ? "selected" : ""}>${n}</option>`).join("")}
       </select></div>
     </div>
+
+    <div class="field"><label>Если не выполнена в срок</label><select class="input" data-f="carry">
+      ${Object.entries(CARRY_NAMES).map(([k, n]) => `<option value="${k}" ${(t.carry || "") === k ? "selected" : ""} ${k === "shift" && !seriesOf(t) ? "disabled" : ""}>${n}</option>`).join("")}
+    </select>
+    <span class="hint">${carryHint(t)}</span></div>
 
     <div class="field"><label>Теги</label><input class="input" data-f="tags" value="${esc(t.tags.join(", "))}" placeholder="дом, срочно, идеи"></div>
 
@@ -1110,54 +1129,30 @@ async function onSidebarClick(e) {
   if (nav) setView(nav.dataset.view);
 }
 
-/* ================= помодоро ================= */
+/* ================= помодоро (общий с мини-панелью и треем) ================= */
 const pomo = (() => {
-  const DUR = { work: 25 * 60, short: 5 * 60, long: 15 * 60 };
-  let mode = "work", left = DUR.work, endAt = 0, timer = null, label = "";
-
-  const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  function draw() {
-    $("#pomoTime").textContent = fmt(left);
-    $("#pomoStart").textContent = timer ? "Пауза" : left < DUR[mode] ? "Дальше" : "Старт";
-    $("#pomoLabel").textContent = label || { work: "Время сосредоточиться", short: "Короткий перерыв", long: "Длинный перерыв" }[mode];
-    $$(".pomo-modes button").forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
-    $("#pomoDone").textContent = "🍅".repeat(Math.min(+(safeGet("pomo:" + today()) || 0), 12));
-    document.title = timer ? `${fmt(left)} · ${mode === "work" ? "Фокус" : "Перерыв"}` : $("#viewTitle").textContent + " · Ежедневник";
+  let c;
+  function draw(st) {
+    $("#pomoTime").textContent = fmtMMSS(c.left());
+    $("#pomoStart").textContent = st.running ? "Пауза" : st.left < st.durations[st.mode] ? "Дальше" : "Старт";
+    $("#pomoLabel").textContent = st.label || { work: "Время сосредоточиться", short: "Короткий перерыв", long: "Длинный перерыв" }[st.mode];
+    $$(".pomo-modes button").forEach(b => b.classList.toggle("on", b.dataset.mode === st.mode));
+    $("#pomoDone").textContent = "🍅".repeat(Math.min(st.count, 12));
+    document.title = st.running ? `${fmtMMSS(c.left())} · ${POMO_NAMES[st.mode]}` : $("#viewTitle").textContent + " · Ежедневник";
   }
-  function tick() {
-    left = Math.max(0, Math.round((endAt - Date.now()) / 1000));
-    if (left === 0) finish();
-    draw();
-  }
-  function start() {
-    if (timer) { clearInterval(timer); timer = null; draw(); return; }
-    endAt = Date.now() + left * 1000;
-    timer = setInterval(tick, 250);
-    draw();
-  }
-  function setMode(m) { clearInterval(timer); timer = null; mode = m; left = DUR[m]; draw(); }
-  function finish() {
-    clearInterval(timer); timer = null;
-    chime(true);
-    if (mode === "work") {
-      const k = "pomo:" + today(), n = +(safeGet(k) || 0) + 1;
-      safeSet(k, n);
-      notify("🍅 Фокус-сессия завершена", "Время отдохнуть!");
-      setMode(n % 4 === 0 ? "long" : "short");
-    } else {
-      notify("☕ Перерыв окончен", "Возвращаемся к делу");
-      setMode("work");
-    }
-    toast(mode === "work" ? "Перерыв окончен — за работу!" : "Помидор готов! Отдохни 🍅");
+  function finished(st) {
+    // звук играет мини-панель в трее, здесь только подсказка
+    toast(st.finished === "work" ? "Помидор готов! Перерыв уже идёт ☕" : "Перерыв окончен — за работу!");
+    S.pomos[today()] = st.count;
   }
   return {
     init() {
-      $("#pomoStart").onclick = start;
-      $("#pomoReset").onclick = () => setMode(mode);
-      $$(".pomo-modes button").forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
-      draw();
+      c = pomoClient(draw, finished);
+      $("#pomoStart").onclick = () => c.toggle();
+      $("#pomoReset").onclick = () => c.reset();
+      $$(".pomo-modes button").forEach(b => (b.onclick = () => c.mode(b.dataset.mode)));
     },
-    focus(text) { label = "🎯 " + text; setMode("work"); start(); toast("Фокус-сессия запущена"); },
+    focus(text) { c.mode("work", "🎯 " + text).then(() => c.start()); toast("Фокус-сессия запущена"); },
   };
 })();
 
@@ -1341,6 +1336,7 @@ function init() {
     if (v && (TITLES[v] || v.startsWith("list:") || v.startsWith("tag:"))) setView(v);
   };
   window.addEventListener("hashchange", fromHash);
+  window.openView = v => { if (v) setView(v); };
   load().then(() => {
     fromHash();
     checkDeadlines();
@@ -1348,7 +1344,9 @@ function init() {
   });
   // перерисовка после полуночи, чтобы «Сегодня» не устаревало
   let day = today();
-  setInterval(() => { if (today() !== day) { day = today(); render(); } }, 60000);
+  setInterval(() => { if (today() !== day) { day = today(); load(); } }, 60000);
+  // переносы задач делает сервер — подхватываем их, когда окно снова в фокусе
+  window.addEventListener("focus", () => load());
 }
 
 init();

@@ -486,3 +486,6 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .quick-add { cursor: text; }
 .quick-add input { align-self: stretch; padding: 10px 0; }
 .quick-add .btn { cursor: pointer; }
+.ico-svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+[data-act="del"]:hover, [data-d="delete"]:hover, [data-del-habit]:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.field .hint { margin: 2px 2px 0; line-height: 1.4; }

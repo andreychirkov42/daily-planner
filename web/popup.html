@@ -39,6 +39,25 @@
   .running .clock { color: var(--green); font-variant-numeric: tabular-nums; font-weight: 800; }
   .running button { border: 0; background: rgba(255,255,255,.08); border-radius: 6px; padding: 2px 8px; }
 
+  .pomo { margin: 10px 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 10px; }
+  .pomo.work { --pm: #4f8cff; } .pomo.short { --pm: #2fd0c0; } .pomo.long { --pm: #a78bfa; }
+  .pomo-row { display: flex; align-items: center; gap: 8px; }
+  .pomo-modes { display: flex; gap: 2px; background: var(--bg); border-radius: 8px; padding: 2px; }
+  .pomo-modes button { border: 0; background: none; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 800; color: var(--ink-3); }
+  .pomo-modes button.on { background: color-mix(in srgb, var(--pm) 22%, transparent); color: var(--pm); }
+  .pomo-count { margin-left: auto; font-size: 12px; letter-spacing: 1px; }
+  .pomo-main { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .pomo-time { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; line-height: 1.1; }
+  .pomo.is-running .pomo-time { color: var(--pm); }
+  .pomo-ctrl { margin-left: auto; display: flex; gap: 6px; }
+  .pbtn { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--card-2); display: grid; place-items: center; font-size: 13px; color: var(--ink-2); }
+  .pbtn:hover { color: var(--ink); border-color: var(--ink-3); }
+  .pbtn.primary { width: 44px; background: var(--pm); border-color: transparent; color: #fff; font-size: 15px; }
+  .pomo-bar { height: 4px; border-radius: 4px; background: var(--bg); margin-top: 8px; overflow: hidden; }
+  .pomo-bar i { display: block; height: 100%; width: 0; background: var(--pm); border-radius: 4px; transition: width .5s linear; }
+  .pomo-label { font-size: 11.5px; color: var(--ink-2); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 16px; }
+  .pomo.ring { animation: ring .6s ease 3; }
+  @keyframes ring { 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--pm) 45%, transparent); } }
   .tabs { display: flex; gap: 2px; margin: 12px 14px 0; padding: 3px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
   .tabs button { flex: 1; border: 0; background: none; border-radius: 7px; padding: 7px 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--ink-2); }
   .tabs button.on { background: rgba(79,163,255,.14); color: var(--green); }
@@ -103,6 +122,25 @@
   </div>
   <div id="running"></div>
 
+  <div class="pomo work" id="pomo">
+    <div class="pomo-row">
+      <div class="pomo-modes">
+        <button data-pm="work" class="on">ФОКУС</button><button data-pm="short">ПЕРЕРЫВ</button><button data-pm="long">ДЛИННЫЙ</button>
+      </div>
+      <span class="pomo-count" id="pomoCount" title="Фокус-сессий сегодня"></span>
+    </div>
+    <div class="pomo-main">
+      <div class="pomo-time" id="pomoTime">25:00</div>
+      <div class="pomo-ctrl">
+        <button class="pbtn" id="pomoReset" title="Сначала">↺</button>
+        <button class="pbtn" id="pomoSkip" title="Пропустить">⏭</button>
+        <button class="pbtn primary" id="pomoGo" title="Старт / пауза">▶</button>
+      </div>
+    </div>
+    <div class="pomo-bar"><i id="pomoBar"></i></div>
+    <div class="pomo-label" id="pomoLabel"></div>
+  </div>
+
   <div class="tabs" id="tabs">
     <button data-tab="today" class="on">СЕГОДНЯ<span class="n"></span></button>
     <button data-tab="late">ПРОСРОЧЕНО<span class="n"></span></button>
@@ -117,8 +155,8 @@
   <div class="list" id="list"></div>
 
   <div class="foot">
-    <button class="btn" id="openBtn">🖥 Открыть</button>
-    <button class="btn" id="planBtn" title="Открыть расписание дня">⏰ Расписание</button>
+    <button class="btn" id="openBtn" title="Окно программы">🖥 Открыть</button>
+    <button class="btn" id="browserBtn" title="Открыть страницу в браузере">🌐 В браузере</button>
     <button class="btn ghost" id="quitBtn" title="Закрыть программу">⏻ Выход</button>
   </div>
 
@@ -138,7 +176,7 @@ const MOODS = [
 
 // функции, которые предоставляет Go-обёртка окна (в обычном браузере их нет)
 const host = name => (...a) => (typeof window[name] === "function" ? window[name](...a) : null);
-const hidePopup = host("hidePopup"), openMain = host("openMain"), quitApp = host("quitApp");
+const hidePopup = host("hidePopup"), openMain = host("openMain"), openInBrowser = host("openInBrowser"), quitApp = host("quitApp");
 
 async function api(method, path, body) {
   const r = await fetch("/api" + path, {
@@ -243,7 +281,11 @@ document.addEventListener("click", async e => {
     load(); return;
   }
   if (el.id === "openBtn") { openMain(""); return; }
-  if (el.id === "planBtn") { openMain("schedule"); return; }
+  if (el.id === "browserBtn") { openInBrowser(""); return; }
+  if (d.pm) { pomo.mode(d.pm); return; }
+  if (el.id === "pomoGo") { pomo.toggle(); return; }
+  if (el.id === "pomoReset") { pomo.reset(); return; }
+  if (el.id === "pomoSkip") { pomo.skip(); return; }
   if (el.id === "quitBtn") { quitApp(); return; }
   if (el.id === "closeBtn") { hidePopup(); return; }
 });
@@ -278,8 +320,41 @@ setInterval(() => {
   }
 }, 1000);
 
+// таймер общий с основным окном; когда сессия кончается, Go сам показывает эту панель
+let audioCtx;
+function beep() {
+  try {
+    audioCtx = audioCtx || new AudioContext();
+    [660, 880, 990].forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      const t0 = audioCtx.currentTime + i * 0.16;
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0); o.stop(t0 + 0.55);
+    });
+  } catch { /* без звука */ }
+}
+const pomo = pomoClient(st => {
+  const box = $("#pomo");
+  box.className = `pomo ${st.mode} ${st.running ? "is-running" : ""} ${box.classList.contains("ring") ? "ring" : ""}`;
+  $("#pomoTime").textContent = fmtMMSS(pomo ? pomo.left() : st.left);
+  $("#pomoGo").textContent = st.running ? "⏸" : "▶";
+  $("#pomoBar").style.width = (pomo ? pomo.progress() * 100 : 0) + "%";
+  $("#pomoCount").textContent = st.count ? "🍅".repeat(Math.min(st.count, 8)) + (st.count > 8 ? " " + st.count : "") : "";
+  $("#pomoLabel").textContent = st.label || (st.running ? (st.mode === "work" ? "Не отвлекайся — уведомлю, когда пора отдохнуть" : "Отдыхай: встань, разомнись, попей воды") : "Нажми ▶, чтобы начать " + POMO_NAMES[st.mode].toLowerCase());
+  document.querySelectorAll("[data-pm]").forEach(b => b.classList.toggle("on", b.dataset.pm === st.mode));
+}, st => {
+  beep();
+  const box = $("#pomo");
+  box.classList.remove("ring"); void box.offsetWidth; box.classList.add("ring");
+  setTimeout(() => box.classList.remove("ring"), 2000);
+});
+
 // вызывается из Go при каждом показе окна
-window.onPopupShow = () => { load(); };
+window.onPopupShow = () => { load(); pomo.refresh(); };
 load();
 </script>
 </body>
