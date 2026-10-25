@@ -190,8 +190,8 @@ function dateBuckets(tasks) {
   ];
 }
 
-function viewGrouped(tasks, icon, emptyText) {
-  if (!tasks.length) return empty(icon, emptyText);
+function viewGrouped(tasks, iconName, emptyText) {
+  if (!tasks.length) return empty(iconName, emptyText);
   const hideList = S.view.startsWith("list:");
   return dateBuckets(tasks).map(([t, arr, cls]) => group(t, arr, cls, { hideList })).join("");
 }

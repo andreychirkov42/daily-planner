@@ -175,6 +175,22 @@ func (s *Store) Snapshot() Data {
 	return d
 }
 
+// DueCounts — сколько невыполненных задач на день и сколько просрочено, без копирования данных.
+func (s *Store) DueCounts(day string) (today, late int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, t := range s.data.Tasks {
+		switch {
+		case t.Done || t.Due == "":
+		case t.Due == day:
+			today++
+		case t.Due < day:
+			late++
+		}
+	}
+	return today, late
+}
+
 func (s *Store) Tasks() []*Task {
 	return s.Snapshot().Tasks
 }
@@ -532,6 +548,7 @@ func (s *Store) Rollover(now time.Time) (int, error) {
 		switch {
 		case t.Carry == "move" || (t.Carry == "shift" && s.seriesLocked(t.Series) == nil):
 			t.Due = day
+			t.DueTime = ""
 			changed++
 		case t.Carry == "shift":
 			replan[t.Series] = true
@@ -594,6 +611,7 @@ func (s *Store) replanLocked(sr *Series, now time.Time) int {
 		}
 		if due := d.Format("2006-01-02"); t.Due != due {
 			t.Due = due
+			t.DueTime = ""
 			changed++
 		}
 		free--

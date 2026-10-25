@@ -56,6 +56,9 @@ const sketch = (() => {
       e.currentTarget.download = (root.querySelector("#skTitle").value || "набросок") + ".png";
     });
     document.addEventListener("keydown", onKey);
+    // вкладку закрывают или переключают — не ждём таймера, сохраняем сразу
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") save(); });
+    addEventListener("pagehide", () => save());
     syncBar();
     loadList();
   }
@@ -144,7 +147,7 @@ const sketch = (() => {
     dirty = true;
     status("…");
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 1200);
+    saveTimer = setTimeout(save, 600);
     syncBar();
   }
 

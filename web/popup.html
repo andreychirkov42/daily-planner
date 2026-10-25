@@ -418,6 +418,7 @@ $("#pomoTime").addEventListener("click", () => editClock($("#pomoTime"), pomo));
 bindClockArrows($("#pomo"), $("#pomoTime"), pomo);
 
 function toggleSettings() {
+  if (!pomo.state()) return; // таймер ещё не загрузился
   const box = $("#pomoSettings");
   const open = box.hidden;
   box.hidden = !open;

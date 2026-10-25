@@ -383,7 +383,7 @@ func guard(h http.Handler) http.Handler {
 				httpError(w, http.StatusForbidden, "запрос с чужого сайта")
 				return
 			}
-			if r.ContentLength > 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			if r.ContentLength != 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 				httpError(w, http.StatusUnsupportedMediaType, "нужен application/json")
 				return
 			}

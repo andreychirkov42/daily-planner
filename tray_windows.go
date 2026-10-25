@@ -473,20 +473,10 @@ func (a *app) onTrayReady() {
 func trayTooltip(s *Store, pomo *Pomodoro) string {
 	if st := pomo.State(); st.Running {
 		left := max(0, int((st.EndAt-time.Now().UnixMilli()+999)/1000))
-		name := map[string]string{"work": "🍅 Фокус", "short": "☕ Перерыв", "long": "🌿 Длинный перерыв"}[st.Mode]
+		name := map[string]string{"work": "Фокус", "short": "Перерыв", "long": "Длинный перерыв"}[st.Mode]
 		return fmt.Sprintf("%s %02d:%02d · Clepsy", name, left/60, left%60)
 	}
-	today := today()
-	left, late := 0, 0
-	for _, t := range s.Tasks() {
-		switch {
-		case t.Done || t.Due == "":
-		case t.Due == today:
-			left++
-		case t.Due < today:
-			late++
-		}
-	}
+	left, late := s.DueCounts(today())
 	tip := fmt.Sprintf("Clepsy — на сегодня: %d", left)
 	if late > 0 {
 		tip += fmt.Sprintf(", просрочено: %d", late)
@@ -515,15 +505,20 @@ func startupLinkPath() string {
 	return filepath.Join(os.Getenv("APPDATA"), `Microsoft\Windows\Start Menu\Programs\Startup`, startupLink)
 }
 
-// autostartEnabled: есть запись в Run и её не выключили в «Автозагрузке» диспетчера задач.
-func autostartEnabled() bool {
-	for _, name := range []string{autostartName, legacyName} {
-		if regString(runKey, name) != "" {
-			return !disabledInTaskManager(approvedRun, name)
-		}
-	}
-	return false
+func autostartPresent() bool {
+	return regString(runKey, autostartName) != "" || regString(runKey, legacyName) != ""
 }
+
+// autostartEnabled: запись в Run есть, и ни её, ни ярлык не выключили в «Автозагрузке» диспетчера задач.
+func autostartEnabled() bool {
+	return autostartPresent() &&
+		!disabledInTaskManager(approvedRun, autostartName) &&
+		!disabledInTaskManager(approvedRun, legacyName) &&
+		!disabledInTaskManager(approvedLinks, startupLink)
+}
+
+// «выключено» для StartupApproved
+var approvedOff = []byte{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 func disabledInTaskManager(key, name string) bool {
 	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE)
@@ -610,6 +605,14 @@ func psQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
 // если exe перенесли, и восстанавливает ярлык. Выключенный пользователем автозапуск не трогает.
 func repairAutostart() {
 	if !autostartEnabled() {
+		if autostartPresent() {
+			// одну из двух записей выключили в диспетчере задач — выключаем и вторую,
+			// иначе программа всё равно запустится через неё
+			_ = setRegValue(approvedRun, autostartName, approvedOff)
+			if _, err := os.Stat(startupLinkPath()); err == nil {
+				_ = setRegValue(approvedLinks, startupLink, approvedOff)
+			}
+		}
 		return
 	}
 	exe, _ := os.Executable()

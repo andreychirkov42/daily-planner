@@ -61,6 +61,8 @@ function applyTheme() {
 
 // reportTheme сообщает программе тему, чтобы заголовок окна был в цвет приложения, а не белым
 function reportTheme() {
+  // у браузера своё хранилище и своя тема — красить заголовок окна программы должно только оно само
+  if (!(window.chrome && window.chrome.webview)) return;
   const dark = document.documentElement.dataset.theme === "dark" ||
     (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
   fetch("/api/app/theme", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dark }) }).catch(() => {});

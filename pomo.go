@@ -126,7 +126,8 @@ func (p *Pomodoro) Do(action, mode, label string, minutes float64) (PomoState, e
 		if p.st.Running {
 			cur = p.leftLocked(now)
 		}
-		left := min(max(cur+int(minutes*60), 60), 600*60)
+		// не меньше минуты, но и не больше, чем было: «−1» при 0:30 оставляет 0:30
+		left := min(max(cur+int(minutes*60), min(cur, 60)), 600*60)
 		p.st.Left = left
 		if p.st.Running {
 			p.st.EndAt = now.Add(time.Duration(left) * time.Second).UnixMilli()

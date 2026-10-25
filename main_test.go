@@ -85,7 +85,7 @@ func TestRolloverMoveAndShift(t *testing.T) {
 	s := newTestStore(t)
 	// воскресенье 25.10.2026; план: пн 1, вт 2, ср 2, чт 1, пт 1, сб 0, вс 1
 	sr, _ := s.CreateSeries(&Series{Name: "Курс", PerDay: [7]int{1, 1, 2, 2, 1, 1, 0}})
-	chore, _ := s.CreateTask(&Task{Title: "Полить цветы", Due: "2026-10-23", Carry: "move"})
+	chore, _ := s.CreateTask(&Task{Title: "Полить цветы", Due: "2026-10-23", DueTime: "10:00", Carry: "move"})
 	stay, _ := s.CreateTask(&Task{Title: "Просрочка", Due: "2026-10-23"})
 	dues := []string{"2026-10-24", "2026-10-26", "2026-10-27", "2026-10-27", "2026-10-28"}
 	var lessons []*Task
@@ -100,6 +100,9 @@ func TestRolloverMoveAndShift(t *testing.T) {
 	get := func(id string) *Task { _, tk := s.findTask(id); return tk }
 	if get(chore.ID).Due != "2026-10-26" {
 		t.Errorf("move: срок %s, ожидали перенос на сегодня", get(chore.ID).Due)
+	}
+	if get(chore.ID).DueTime != "" {
+		t.Error("перенесённая задача не должна сохранять вчерашнее время")
 	}
 	if get(stay.ID).Due != "2026-10-23" {
 		t.Error("задача без переноса не должна двигаться")
@@ -139,6 +142,10 @@ func TestPomodoroCustomSettings(t *testing.T) {
 	p.Do("set", "", "", 1.5)
 	if st, _ := p.Do("add", "", "", -1); st.Left != 60 {
 		t.Fatalf("−1 мин от 1:30: осталось %d с, ожидали минимум 60", st.Left)
+	}
+	p.Do("set", "", "", 0.5)
+	if st, _ := p.Do("add", "", "", -1); st.Left != 30 {
+		t.Fatalf("−1 мин при 0:30 не должна прибавлять время: осталось %d с", st.Left)
 	}
 	// после двух фокусов — длинный перерыв, и без автозапуска
 	p.Do("start", "", "", 0)
