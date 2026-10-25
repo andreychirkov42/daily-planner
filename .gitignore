@@ -1,0 +1,11 @@
+# сборка
+*.exe
+
+# личные данные и логи
+data.json
+data.json.tmp
+test-data.json
+planner.log
+
+# локальные настройки
+.claude/

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ежедневник</title>
+  <link rel="icon" href="icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lora:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <img class="brand-mark" src="icon.png" alt="">
+      <span class="brand-name">Ежедневник</span>
+    </div>
+
+    <label class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Поиск задач…  /">
+    </label>
+
+    <nav class="nav" id="nav">
+      <button data-view="today"><span class="ico">☀️</span>Сегодня<span class="count" data-count="today"></span></button>
+      <button data-view="upcoming"><span class="ico">🗓️</span>Предстоящие<span class="count" data-count="upcoming"></span></button>
+      <button data-view="inbox"><span class="ico">📥</span>Входящие<span class="count" data-count="inbox"></span></button>
+      <button data-view="all"><span class="ico">📋</span>Все задачи<span class="count" data-count="all"></span></button>
+      <div class="nav-sep"></div>
+      <button data-view="board"><span class="ico">🧱</span>Доска<span class="count" data-count="doing"></span></button>
+      <button data-view="schedule"><span class="ico">⏰</span>Расписание дня</button>
+      <button data-view="calendar"><span class="ico">📆</span>Календарь</button>
+      <button data-view="matrix"><span class="ico">🎯</span>Матрица Эйзенхауэра</button>
+      <button data-view="habits"><span class="ico">🔥</span>Привычки</button>
+      <button data-view="stats"><span class="ico">📊</span>Статистика</button>
+      <button data-view="completed"><span class="ico">✅</span>Выполненные</button>
+    </nav>
+
+    <div class="side-head">
+      <span>Списки</span>
+      <button class="icon-btn" id="addList" title="Новый список">＋</button>
+    </div>
+    <div class="nav" id="lists"></div>
+
+    <div class="side-head"><span>Теги</span></div>
+    <div class="tags-cloud" id="tagsCloud"></div>
+
+    <div class="pomodoro" id="pomodoro">
+      <div class="pomo-top">
+        <div class="pomo-modes">
+          <button data-mode="work" class="on">Фокус</button>
+          <button data-mode="short">Перерыв</button>
+          <button data-mode="long">Длинный</button>
+        </div>
+      </div>
+      <div class="pomo-time" id="pomoTime">25:00</div>
+      <div class="pomo-label" id="pomoLabel">Помодоро-таймер</div>
+      <div class="pomo-ctrl">
+        <button class="btn btn-primary" id="pomoStart">Старт</button>
+        <button class="btn" id="pomoReset">Сброс</button>
+      </div>
+      <div class="pomo-done" id="pomoDone"></div>
+    </div>
+
+    <div class="side-foot">
+      <button class="icon-btn" id="themeBtn" title="Тема">🌓</button>
+      <button class="icon-btn" id="notifyBtn" title="Напоминания о дедлайнах">🔔</button>
+      <a class="icon-btn" href="/api/export" title="Экспорт в JSON">⬇️</a>
+      <label class="icon-btn" title="Импорт из JSON">⬆️<input type="file" id="importFile" accept="application/json" hidden></label>
+      <button class="icon-btn" id="helpBtn" title="Горячие клавиши">⌨️</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="main-head">
+      <button class="icon-btn burger" id="burger">☰</button>
+      <div>
+        <div class="eyebrow" id="eyebrow"></div>
+        <h1 id="viewTitle">Сегодня</h1>
+      </div>
+      <div class="head-right" id="headRight"></div>
+    </header>
+
+    <form class="quick-add" id="quickAdd" autocomplete="off">
+      <span class="qa-plus">＋</span>
+      <input id="qaInput" placeholder="Добавить задачу… напр. «Сдать отчёт завтра в 18:00 !3 #работа @Работа»">
+      <button class="btn btn-primary" type="submit">Добавить</button>
+    </form>
+    <div class="qa-preview" id="qaPreview"></div>
+
+    <section id="view" class="view"></section>
+  </main>
+
+  <aside class="detail" id="detail" aria-hidden="true"></aside>
+</div>
+
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-card">
+    <h3>Горячие клавиши и быстрый ввод</h3>
+    <div class="help-grid">
+      <kbd>N</kbd><span>новая задача</span>
+      <kbd>/</kbd><span>поиск</span>
+      <kbd>1</kbd>–<kbd>9</kbd><span>переключить раздел</span>
+      <kbd>P</kbd><span>спланировать день</span>
+      <kbd>Esc</kbd><span>закрыть панель</span>
+      <kbd>T</kbd><span>сменить тему</span>
+    </div>
+    <h4>В строке добавления можно писать:</h4>
+    <ul class="help-list">
+      <li><b>сегодня, завтра, послезавтра, пн…вс, 25.12, через 3 дня</b> — дедлайн</li>
+      <li><b>в 18:00</b> — время</li>
+      <li><b>!1 !2 !3</b> — приоритет (низкий / средний / высокий)</li>
+      <li><b>#тег</b> — теги, <b>@Список</b> — список</li>
+      <li><b>каждый день, по будням, каждую неделю, каждый месяц</b> — повтор</li>
+    </ul>
+    <button class="btn btn-primary" data-close>Понятно</button>
+  </div>
+</div>
+
+<div class="modal" id="planModal" hidden>
+  <div class="modal-card plan-card" id="planCard"></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="shared.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
