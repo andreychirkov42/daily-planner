@@ -78,13 +78,14 @@ type Habit struct {
 }
 
 type Data struct {
-	Tasks  []*Task           `json:"tasks"`
-	Lists  []*List           `json:"lists"`
-	Habits []*Habit          `json:"habits"`
-	Notes  map[string]string `json:"notes"` // дата -> заметка дня
-	Pomos  map[string]int    `json:"pomos"` // дата -> завершённых фокус-сессий
-	Series []*Series         `json:"series"`
-	Pomo   *PomoSettings     `json:"pomoSettings,omitempty"`
+	Tasks    []*Task           `json:"tasks"`
+	Lists    []*List           `json:"lists"`
+	Habits   []*Habit          `json:"habits"`
+	Notes    map[string]string `json:"notes"` // дата -> заметка дня
+	Pomos    map[string]int    `json:"pomos"` // дата -> завершённых фокус-сессий
+	Series   []*Series         `json:"series"`
+	Pomo     *PomoSettings     `json:"pomoSettings,omitempty"`
+	Sketches []*Sketch         `json:"sketches"`
 }
 
 type Store struct {

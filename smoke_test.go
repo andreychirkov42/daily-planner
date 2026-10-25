@@ -42,6 +42,9 @@ func TestSmokePages(t *testing.T) {
 			if !regexp.MustCompile(`data-ready="1"`).MatchString(htmlTag) {
 				t.Fatalf("страница не дошла до конца загрузки; тег: %s", htmlTag)
 			}
+			if page == "/?smoke=1" && len(s.Sketches()) == 0 {
+				t.Fatal("линия на холсте не сохранилась")
+			}
 		})
 	}
 }

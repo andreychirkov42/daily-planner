@@ -151,6 +151,7 @@
 
   <div class="brand">
     <img src="icon.png" alt="" style="width:22px;height:22px;border-radius:6px"><b>Ежедневник</b>
+    <button class="pgear" id="sketchBtn" title="Холст для набросков" style="margin-left:4px">✏️</button>
     <div class="stats" id="stats"></div>
   </div>
   <div id="running"></div>
@@ -318,6 +319,7 @@ document.addEventListener("click", async e => {
   }
   if (el.id === "openBtn") { openMain(""); return; }
   if (el.id === "browserBtn") { openInBrowser(""); return; }
+  if (el.id === "sketchBtn") { openMain("sketch"); return; }
   if (d.pm) { pomo.mode(d.pm); return; }
   if (el.id === "pomoGo") { pomo.toggle(); return; }
   if (el.id === "pomoGear") { toggleSettings(); return; }

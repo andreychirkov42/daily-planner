@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -151,6 +152,39 @@ func TestPomodoroCustomSettings(t *testing.T) {
 	s2, _ := NewStore(s.path)
 	if got := NewPomodoro(s2).State().Settings.Work; got != 50 {
 		t.Fatalf("после перезапуска фокус %d мин, ожидали 50", got)
+	}
+}
+
+func TestSketchesStoredAsFiles(t *testing.T) {
+	s := newTestStore(t)
+	// минимальный PNG 1×1
+	png := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	raw, err := decodePNG(png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sk, err := s.SaveSketch("", "Схема", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _ := s.sketchFile(sk.ID)
+	if b, err := os.ReadFile(path); err != nil || len(b) != len(raw) {
+		t.Fatalf("файл рисунка не записан: %v", err)
+	}
+	if _, err := s.SaveSketch(sk.ID, "Новое имя", nil); err != nil || s.Sketches()[0].Title != "Новое имя" {
+		t.Fatalf("переименование: %v", err)
+	}
+	if _, err := s.sketchFile("../data"); err == nil {
+		t.Fatal("путь с ../ должен отклоняться")
+	}
+	if _, err := decodePNG("data:image/png;base64,aGVsbG8="); err == nil {
+		t.Fatal("не-PNG должен отклоняться")
+	}
+	if err := s.DeleteSketch(sk.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("файл рисунка должен удаляться вместе с записью")
 	}
 }
 

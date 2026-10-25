@@ -122,6 +122,7 @@ func setupLog(path string) {
 }
 
 func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
+	registerSketchAPI(mux, s)
 	mux.HandleFunc("GET /api/pomodoro", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, pomo.State())
 	})

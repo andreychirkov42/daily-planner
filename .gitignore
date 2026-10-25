@@ -4,6 +4,7 @@
 # личные данные и логи
 data.json
 data.json.tmp
+sketches/
 test-data.json
 planner.log
 

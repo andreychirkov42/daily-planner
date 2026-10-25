@@ -34,11 +34,12 @@ function renderNav() {
 
 const TITLES = {
   today: "Сегодня", upcoming: "Предстоящие", inbox: "Входящие", all: "Все задачи", calendar: "Календарь",
-  board: "Доска", schedule: "Расписание дня",
+  board: "Доска", schedule: "Расписание дня", sketch: "Холст",
   matrix: "Матрица Эйзенхауэра", habits: "Привычки", stats: "Статистика", completed: "Выполненные",
 };
 
 function setView(v) {
+  if (S.view === "sketch" && v !== "sketch") sketch.flush(); // уходим с холста — сохраняем сразу
   S.view = v;
   S.search = "";
   $("#search").value = "";
@@ -57,11 +58,11 @@ function renderView() {
   $("#eyebrow").textContent = greeting() + " · " + fmtLong.format(new Date());
   document.title = title + " · Ежедневник";
 
-  const noAdd = ["habits", "stats", "completed", "matrix"].includes(v) && !S.search;
+  const noAdd = ["habits", "stats", "completed", "matrix", "sketch"].includes(v) && !S.search;
   $("#quickAdd").style.display = noAdd ? "none" : "";
   $("#qaPreview").style.display = noAdd ? "none" : "";
 
-  const showSort = !["calendar", "habits", "stats", "matrix", "completed", "schedule"].includes(v) || S.search;
+  const showSort = !["calendar", "habits", "stats", "matrix", "completed", "schedule", "sketch"].includes(v) || S.search;
   let head = showSort ? `<select class="input btn-sm" id="sortSel" style="width:auto" title="Сортировка">
       <option value="manual">↕ Вручную</option><option value="smart">🧠 Умная (срочность)</option>
       <option value="priority">⚑ По приоритету</option><option value="due">📅 По сроку</option>
@@ -76,6 +77,7 @@ function renderView() {
       ${S.lists.map(l => `<option value="${l.id}" ${S.boardList === l.id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>` + head;
   }
   else if (v === "schedule") el.innerHTML = viewSchedule();
+  else if (v === "sketch") { el.innerHTML = ""; sketch.mount(el); }
   else if (v === "upcoming") el.innerHTML = viewUpcoming();
   else if (v === "inbox") el.innerHTML = viewGrouped(active().filter(t => !t.listId), "📥", "Входящие пусты — всё разобрано");
   else if (v === "all") el.innerHTML = viewGrouped(active(), "🌿", "Нет активных задач");

@@ -94,6 +94,7 @@ function init() {
     else if (e.key === "t" || e.key === "е") toggleTheme();
     else if (e.key === "?") $("#helpModal").hidden = false;
     else if (e.key === "p" || e.key === "з") openPlan();
+    else if (e.key === "d" || e.key === "в") setView("sketch");
     else if (/^[1-9]$/.test(e.key)) setView(VIEW_KEYS[+e.key - 1]);
   });
 
@@ -137,7 +138,13 @@ async function smokeTour() {
     safeSet("detailMore", "1"); render(); await pause();
     S.selected = null; render();
   }
-  openPlan(); await pause(); $("#planModal").hidden = true;
+  // холст: проводим линию и сохраняем
+  setView("sketch"); await pause();
+  const ov = $(".sk-overlay"), r = ov.getBoundingClientRect();
+  const ev = (type, k) => ov.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX: r.left + r.width * k, clientY: r.top + r.height * k, button: 0 }));
+  ev("pointerdown", 0.2); ev("pointermove", 0.4); ev("pointermove", 0.6); ev("pointerup", 0.6);
+  await sketch.flush();
+    openPlan(); await pause(); $("#planModal").hidden = true;
   $("#pomoGear").click(); await pause(); $("#pomoGear").click();
   setView("today");
 }
