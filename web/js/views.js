@@ -9,11 +9,11 @@ function viewBoard() {
   const done = S.tasks.filter(t => t.done && inList(t) && t.completedAt && ymd(new Date(t.completedAt)) >= weekAgo)
     .sort((x, y) => y.completedAt.localeCompare(x.completedAt));
   const cols = [
-    ["todo", "📝 К выполнению", "var(--ink-3)", sortTasks(a.filter(t => t.status !== "doing"))],
-    ["doing", "🚧 В работе", "var(--warn)", sortTasks(a.filter(t => t.status === "doing"))],
-    ["done", "✅ Готово · 7 дней", "var(--ok)", done],
+    ["todo", icon("circle") + " К выполнению", "var(--ink-3)", sortTasks(a.filter(t => t.status !== "doing"))],
+    ["doing", icon("progress") + " В работе", "var(--warn)", sortTasks(a.filter(t => t.status === "doing"))],
+    ["done", icon("done") + " Готово · 7 дней", "var(--ok)", done],
   ];
-  return `<p class="hint" style="margin:0 0 12px">Перетаскивай карточки между колонками. Запуск таймера ▶ сам переносит задачу «В работу».</p>
+  return `<p class="hint" style="margin:0 0 12px">Перетаскивай карточки между колонками. Запуск таймера ${icon("play")} сам переносит задачу «В работу».</p>
     <div class="board">${cols.map(([k, h, c, arr]) => `<div class="col" data-status="${k}" style="--qc:${c}">
       <h3>${h} <span class="n">${arr.length}</span></h3>
       <div class="tasks">${arr.map(t => taskHTML(t, { drag: true })).join("")}</div></div>`).join("")}</div>`;
@@ -47,7 +47,7 @@ function viewSchedule() {
     return `<div class="block ${t.done ? "done" : ""}" draggable="true" data-block="${t.id}"
       style="top:${startMin / 60 * HOUR_PX + 1}px;height:${Math.max(22, dur / 60 * HOUR_PX - 3)}px;--c:${c}">
       <span class="bt">${t.dueTime}–${endStr}</span> ${esc(t.title)}
-      <button class="unsched" data-unsched-id="${t.id}" title="Убрать со шкалы">✕</button></div>`;
+      <button class="unsched" data-unsched-id="${t.id}" title="Убрать со шкалы">${icon("x")}</button></div>`;
   }).join("");
   const now = new Date();
   const nowTop = ((now.getHours() - START_H) * 60 + now.getMinutes()) / 60 * HOUR_PX;
@@ -59,7 +59,7 @@ function viewSchedule() {
     <div class="sched">
       <div class="sched-side" data-unsched-zone="1">
         <div class="group-head">Не распланировано <span class="n">${unsched.length}</span></div>
-        <div class="tasks">${sortTasks(unsched).map(t => taskHTML(t, { drag: true, hideList: true })).join("") || '<p class="hint">Всё разложено по времени 👌</p>'}</div>
+        <div class="tasks">${sortTasks(unsched).map(t => taskHTML(t, { drag: true, hideList: true })).join("") || '<p class="hint">Всё разложено по времени</p>'}</div>
         ${noDate.length ? `<div class="group-head" style="margin-top:14px">Без даты</div><div class="tasks">${noDate.map(t => taskHTML(t, { drag: true })).join("")}</div>` : ""}
         <p class="hint">Перетащи задачу на шкалу. Длина блока — оценка времени (по умолчанию 30 мин). Верни блок сюда, чтобы снять время.</p>
       </div>
@@ -107,10 +107,10 @@ function viewMatrix() {
   const imp = t => t.priority >= 2;
   const urg = t => t.due && t.due <= soon;
   const q = [
-    ["🔥 Сделать сейчас", "Важно и срочно", "var(--danger)", a.filter(t => imp(t) && urg(t))],
-    ["📌 Запланировать", "Важно, но не срочно", "var(--accent)", a.filter(t => imp(t) && !urg(t))],
-    ["⚡ Делегировать", "Срочно, но не важно", "var(--warn)", a.filter(t => !imp(t) && urg(t))],
-    ["🧊 Отложить", "Не важно и не срочно", "var(--ink-3)", a.filter(t => !imp(t) && !urg(t))],
+    [icon("flame") + " Сделать сейчас", "Важно и срочно", "var(--danger)", a.filter(t => imp(t) && urg(t))],
+    [icon("date") + " Запланировать", "Важно, но не срочно", "var(--accent)", a.filter(t => imp(t) && !urg(t))],
+    [icon("share") + " Делегировать", "Срочно, но не важно", "var(--warn)", a.filter(t => !imp(t) && urg(t))],
+    [icon("archive") + " Отложить", "Не важно и не срочно", "var(--ink-3)", a.filter(t => !imp(t) && !urg(t))],
   ];
   return `<p style="color:var(--ink-3);margin:0 0 12px;font-size:13px">Важные — приоритет «средний» и выше. Срочные — срок в ближайшие 2 дня или просрочен.</p>
     <div class="matrix">${q.map(([h, p, c, arr]) => `<div class="quad" style="--qc:${c}"><h3>${h} <span style="color:var(--ink-3)">${arr.length}</span></h3><p>${p}</p>
@@ -135,13 +135,13 @@ function viewHabits() {
     const last30 = Array.from({ length: 30 }, (_, i) => addDays(td, i - 29));
     const rate = Math.round(last30.filter(d => h.done[d]).length / 30 * 100);
     html += `<tr><td class="name"><i class="dot" style="background:${h.color};display:inline-block"></i>${esc(h.name)}</td>
-      ${days.map(d => `<td><button class="hcheck ${h.done[d] ? "on" : ""}" style="--c:${h.color}" data-habit="${h.id}" data-date="${d}">${h.done[d] ? "✓" : ""}</button></td>`).join("")}
-      <td class="streak">🔥 ${streak(h)}</td>
+      ${days.map(d => `<td><button class="hcheck ${h.done[d] ? "on" : ""}" style="--c:${h.color}" data-habit="${h.id}" data-date="${d}">${h.done[d] ? icon("check") : ""}</button></td>`).join("")}
+      <td class="streak">${icon("flame")} ${streak(h)}</td>
       <td><div class="heat">${last30.map(d => `<i style="${h.done[d] ? `background:${h.color}` : ""}" title="${d}"></i>`).join("")}</div>
         <span style="font-size:11px;color:var(--ink-3)">${rate}%</span></td>
       <td><button class="icon-btn" data-del-habit="${h.id}" title="Удалить">${TRASH_SVG}</button></td></tr>`;
   }
-  html += `</tbody></table>${S.habits.length ? "" : empty("🌱", "Добавь привычку, которую хочешь выработать: зарядка, чтение, вода…")}</div>
+  html += `</tbody></table>${S.habits.length ? "" : empty("flame", "Добавь привычку, которую хочешь выработать: зарядка, чтение, вода…")}</div>
     <form class="add-habit" id="addHabit"><input class="input" name="name" placeholder="Новая привычка, напр. «Читать 20 минут»" required>
     <button class="btn btn-primary">Добавить</button></form>`;
   return html;

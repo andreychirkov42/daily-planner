@@ -18,9 +18,9 @@ function renderPreview() {
   if (!raw.trim()) { box.innerHTML = ""; return; }
   const p = parseQuick(raw, S.lists);
   const chips = [];
-  if (p.due) chips.push(`<span class="chip today">📅 ${humanDate(p.due)}${p.dueTime ? " " + p.dueTime : ""}</span>`);
-  if (p.priority) chips.push(`<span class="chip p${p.priority}" style="color:var(--pc)">⚑ ${PRI_NAMES[p.priority]}</span>`);
-  if (p.repeat) chips.push(`<span class="chip">🔁 ${REPEAT_NAMES[p.repeat]}</span>`);
+  if (p.due) chips.push(`<span class="chip today">${icon("date")} ${humanDate(p.due)}${p.dueTime ? " " + p.dueTime : ""}</span>`);
+  if (p.priority) chips.push(`<span class="chip p${p.priority}" style="color:var(--pc)">${icon("flag")} ${PRI_NAMES[p.priority]}</span>`);
+  if (p.repeat) chips.push(`<span class="chip">${icon("repeat")} ${REPEAT_NAMES[p.repeat]}</span>`);
   if (p.listId) { const l = listById(p.listId); chips.push(`<span class="chip"><i class="dot" style="background:${l.color};margin:0"></i>${esc(l.name)}</span>`); }
   for (const t of p.tags) chips.push(`<span class="chip tag">#${esc(t)}</span>`);
   box.innerHTML = chips.join("");

@@ -33,24 +33,24 @@
     </label>
 
     <nav class="nav" id="nav">
-      <button data-view="today"><span class="ico">☀️</span>Сегодня<span class="count" data-count="today"></span></button>
-      <button data-view="upcoming"><span class="ico">🗓️</span>Предстоящие<span class="count" data-count="upcoming"></span></button>
-      <button data-view="inbox"><span class="ico">📥</span>Входящие<span class="count" data-count="inbox"></span></button>
-      <button data-view="all"><span class="ico">📋</span>Все задачи<span class="count" data-count="all"></span></button>
+      <button data-view="today"><span class="ico"><i data-i="sun"></i></span>Сегодня<span class="count" data-count="today"></span></button>
+      <button data-view="upcoming"><span class="ico"><i data-i="upcoming"></i></span>Предстоящие<span class="count" data-count="upcoming"></span></button>
+      <button data-view="inbox"><span class="ico"><i data-i="inbox"></i></span>Входящие<span class="count" data-count="inbox"></span></button>
+      <button data-view="all"><span class="ico"><i data-i="list"></i></span>Все задачи<span class="count" data-count="all"></span></button>
       <div class="nav-sep"></div>
-      <button data-view="board"><span class="ico">🧱</span>Доска<span class="count" data-count="doing"></span></button>
-      <button data-view="schedule"><span class="ico">⏰</span>Расписание дня</button>
-      <button data-view="calendar"><span class="ico">📆</span>Календарь</button>
-      <button data-view="sketch"><span class="ico">✏️</span>Холст</button>
-      <button data-view="matrix"><span class="ico">🎯</span>Матрица Эйзенхауэра</button>
-      <button data-view="habits"><span class="ico">🔥</span>Привычки</button>
-      <button data-view="stats"><span class="ico">📊</span>Статистика</button>
-      <button data-view="completed"><span class="ico">✅</span>Выполненные</button>
+      <button data-view="board"><span class="ico"><i data-i="board"></i></span>Доска<span class="count" data-count="doing"></span></button>
+      <button data-view="schedule"><span class="ico"><i data-i="clock"></i></span>Расписание дня</button>
+      <button data-view="calendar"><span class="ico"><i data-i="calendar"></i></span>Календарь</button>
+      <button data-view="sketch"><span class="ico"><i data-i="pen"></i></span>Холст</button>
+      <button data-view="matrix"><span class="ico"><i data-i="matrix"></i></span>Матрица Эйзенхауэра</button>
+      <button data-view="habits"><span class="ico"><i data-i="flame"></i></span>Привычки</button>
+      <button data-view="stats"><span class="ico"><i data-i="chart"></i></span>Статистика</button>
+      <button data-view="completed"><span class="ico"><i data-i="done"></i></span>Выполненные</button>
     </nav>
 
     <div class="side-head">
       <span>Списки</span>
-      <button class="icon-btn" id="addList" title="Новый список">＋</button>
+      <button class="icon-btn" id="addList" title="Новый список"><i data-i="plus"></i></button>
     </div>
     <div class="nav" id="lists"></div>
 
@@ -64,7 +64,7 @@
           <button data-mode="short">Перерыв</button>
           <button data-mode="long">Длинный</button>
         </div>
-        <button class="icon-btn pomo-gear" id="pomoGear" title="Настроить время">⚙</button>
+        <button class="icon-btn pomo-gear" id="pomoGear" title="Настроить время"><i data-i="settings"></i></button>
       </div>
       <div class="pomo-clock" id="pomoClock">
         <div class="pomo-time" id="pomoTime" title="Нажми, чтобы ввести своё время, или крути колёсико">25:00</div>
@@ -80,17 +80,17 @@
     </div>
 
     <div class="side-foot">
-      <button class="icon-btn" id="themeBtn" title="Тема">🌓</button>
-      <button class="icon-btn" id="notifyBtn" title="Напоминания о дедлайнах">🔔</button>
-      <a class="icon-btn" href="/api/export" title="Экспорт в JSON">⬇️</a>
-      <label class="icon-btn" title="Импорт из JSON">⬆️<input type="file" id="importFile" accept="application/json" hidden></label>
-      <button class="icon-btn" id="helpBtn" title="Горячие клавиши">⌨️</button>
+      <button class="icon-btn" id="themeBtn" title="Тема"><i data-i="theme"></i></button>
+      <button class="icon-btn" id="notifyBtn" title="Напоминания о дедлайнах"><i data-i="bell"></i></button>
+      <a class="icon-btn" href="/api/export" title="Экспорт в JSON"><i data-i="download"></i></a>
+      <label class="icon-btn" title="Импорт из JSON"><i data-i="upload"></i><input type="file" id="importFile" accept="application/json" hidden></label>
+      <button class="icon-btn" id="helpBtn" title="Горячие клавиши"><i data-i="keyboard"></i></button>
     </div>
   </aside>
 
   <main class="main">
     <header class="main-head">
-      <button class="icon-btn burger" id="burger">☰</button>
+      <button class="icon-btn burger" id="burger"><i data-i="list"></i></button>
       <div>
         <div class="eyebrow" id="eyebrow"></div>
         <h1 id="viewTitle">Сегодня</h1>
@@ -99,7 +99,7 @@
     </header>
 
     <form class="quick-add" id="quickAdd" autocomplete="off">
-      <span class="qa-plus">＋</span>
+      <span class="qa-plus"><i data-i="plus"></i></span>
       <input id="qaInput" placeholder="Добавить задачу… напр. «Сдать отчёт завтра в 18:00 !3 #работа @Работа»">
       <button class="btn btn-primary" type="submit">Добавить</button>
     </form>
@@ -141,6 +141,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="icons.js"></script>
 <script src="shared.js"></script>
 <script src="js/core.js"></script>
 <script src="js/quickadd.js"></script>

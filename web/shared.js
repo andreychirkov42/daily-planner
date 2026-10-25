@@ -123,7 +123,7 @@ function pomoClient(onChange, onFinish) {
   };
 }
 
-const TRASH_SVG = `<svg class="ico-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12a2 2 0 0 0 2 1.8h7a2 2 0 0 0 2-1.8l1-12M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7"/></svg>`;
+const TRASH_SVG = icon("trash"); // из общего набора icons.js
 
 // parseClock понимает «25», «12:30», «1:05:00», «7,5» и возвращает минуты (или NaN).
 function parseClock(str) {

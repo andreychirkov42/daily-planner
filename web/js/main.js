@@ -3,6 +3,7 @@
 
 /* ================= инициализация ================= */
 function init() {
+  hydrateIcons(); // <i data-i> в разметке → SVG
   applyTheme();
   $("#quickAdd").addEventListener("submit", quickAdd);
   $("#qaInput").addEventListener("input", renderPreview);
@@ -63,7 +64,7 @@ function init() {
   $("#notifyBtn").onclick = async () => {
     if (!("Notification" in window)) return toast("Браузер не поддерживает уведомления");
     const p = await Notification.requestPermission();
-    toast(p === "granted" ? "Напоминания о дедлайнах включены 🔔" : "Уведомления запрещены в браузере");
+    toast(p === "granted" ? "Напоминания о дедлайнах включены" : "Уведомления запрещены в браузере");
   };
   $("#importFile").addEventListener("change", async e => {
     const f = e.target.files[0];

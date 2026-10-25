@@ -12,12 +12,12 @@ const pomo = (() => {
       b.classList.toggle("on", b.dataset.mode === st.mode);
       b.innerHTML = { work: "Фокус", short: "Перерыв", long: "Длинный" }[b.dataset.mode] + "<small>" + st.settings[b.dataset.mode] + " мин</small>";
     });
-    $("#pomoDone").textContent = "🍅".repeat(Math.min(st.count, 12));
+    $("#pomoDone").innerHTML = '<i class="tomato"></i>'.repeat(Math.min(st.count, 12));
     document.title = st.running ? `${fmtMMSS(c.left())} · ${POMO_NAMES[st.mode]}` : $("#viewTitle").textContent + " · Clepsy";
   }
   function finished(st) {
     // звук играет мини-панель в трее, здесь только подсказка
-    toast(st.finished === "work" ? "Помидор готов! Перерыв уже идёт ☕" : "Перерыв окончен — за работу!");
+    toast(st.finished === "work" ? "Помидор готов! Перерыв уже идёт" : "Перерыв окончен — за работу!");
     S.pomos[today()] = st.count;
   }
   return {
@@ -39,6 +39,6 @@ const pomo = (() => {
       };
       bindPomoSettings(box, c, close);
     },
-    focus(text) { c.mode("work", "🎯 " + text).then(() => c.start()); toast("Фокус-сессия запущена"); },
+    focus(text) { c.mode("work", text).then(() => c.start()); toast("Фокус-сессия запущена"); },
   };
 })();

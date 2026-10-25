@@ -5,7 +5,7 @@ const sketch = (() => {
   const W = 1920, H = 1200; // постоянное разрешение листа, на экране масштабируется
   const PAPER = "#fdfcf9";
   const COLORS = ["#1f2430", "#2f6bff", "#ef4d5a", "#22a06b", "#f29a2e", "#8b5cf6", "#8a94a6"];
-  const TOOLS = { pen: "✏️ Ручка", marker: "🖍 Маркер", eraser: "🧽 Ластик" };
+  const TOOLS = { pen: ["pen", "Ручка"], marker: ["marker", "Маркер"], eraser: ["eraser", "Ластик"] };
 
   let root = null, canvas, ctx, overlay, octx;
   let tool = safeGet("sk:tool") || "pen";
@@ -19,20 +19,20 @@ const sketch = (() => {
     root.className = "sk";
     root.innerHTML = `
       <div class="sk-bar">
-        <div class="sk-group">${Object.entries(TOOLS).map(([k, n]) => `<button class="sk-btn" data-tool="${k}" title="${n} (${{ pen: "B", marker: "M", eraser: "E" }[k]})">${n}</button>`).join("")}</div>
+        <div class="sk-group">${Object.entries(TOOLS).map(([k, [ic, n]]) => `<button class="sk-btn" data-tool="${k}" title="${n} (${{ pen: "B", marker: "M", eraser: "E" }[k]})">${icon(ic)} ${n}</button>`).join("")}</div>
         <div class="sk-group">${COLORS.map(c => `<button class="sk-color" data-color="${c}" style="--c:${c}" title="${c}"></button>`).join("")}
           <label class="sk-color sk-custom" title="Свой цвет"><input type="color" id="skPick"></label></div>
         <label class="sk-size" title="Толщина ( [ и ] )"><input type="range" id="skSize" min="1" max="48"><b id="skSizeVal"></b></label>
         <div class="sk-group">
-          <button class="sk-btn" data-act="undo" title="Отменить (Ctrl+Z)">↶</button>
-          <button class="sk-btn" data-act="redo" title="Повторить (Ctrl+Y)">↷</button>
+          <button class="sk-btn" data-act="undo" title="Отменить (Ctrl+Z)">${icon("undo")}</button>
+          <button class="sk-btn" data-act="redo" title="Повторить (Ctrl+Y)">${icon("redo")}</button>
           <button class="sk-btn" data-act="clear" title="Очистить лист">${TRASH_SVG}</button>
         </div>
         <span class="grow"></span>
         <input class="input sk-title" id="skTitle" placeholder="Название наброска">
         <span class="sk-status" id="skStatus"></span>
-        <a class="sk-btn" id="skDownload" title="Скачать PNG" download>⬇ PNG</a>
-        <button class="btn btn-sm btn-primary" data-act="new" title="Начать новый лист">＋ Новый лист</button>
+        <a class="sk-btn" id="skDownload" title="Скачать PNG" download>${icon("download")} PNG</a>
+        <button class="btn btn-sm btn-primary" data-act="new" title="Начать новый лист">${icon("plus")} Новый лист</button>
       </div>
       <div class="sk-stage"><div class="sk-paper">
         <canvas width="${W}" height="${H}"></canvas><canvas class="sk-overlay" width="${W}" height="${H}"></canvas>
@@ -158,7 +158,7 @@ const sketch = (() => {
       const sk = await api(current ? "PUT" : "POST", "/sketches" + (current ? "/" + current : ""), { title, png });
       current = sk.id;
       root.querySelector("#skTitle").value = sk.title;
-      status("сохранено ✓");
+      status("сохранено");
       loadList();
     } catch {
       dirty = true;

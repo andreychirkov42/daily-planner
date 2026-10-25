@@ -11,10 +11,10 @@ function renderPlan() {
   const todayT = sortTasks(a.filter(t => t.due === td));
   const cand = a.filter(t => !t.due || t.due > td).sort((x, y) => urgency(y) - urgency(x)).slice(0, 8);
   const estSel = t => `<select class="input btn-sm" style="width:auto" data-plan-est="${t.id}">
-    <option value="0">⏳ оценка</option>${[15, 30, 45, 60, 90, 120, 180, 240].map(m => `<option value="${m}" ${t.estimate === m ? "selected" : ""}>${fmtMin(m)}</option>`).join("")}</select>`;
-  const row = (t, btns) => `<div class="plan-row"><span class="t">${t.pinned ? "📌 " : ""}${esc(t.title)}</span>${btns}</div>`;
+    <option value="0">оценка</option>${[15, 30, 45, 60, 90, 120, 180, 240].map(m => `<option value="${m}" ${t.estimate === m ? "selected" : ""}>${fmtMin(m)}</option>`).join("")}</select>`;
+  const row = (t, btns) => `<div class="plan-row"><span class="t">${t.pinned ? icon("pin", "inline") + " " : ""}${esc(t.title)}</span>${btns}</div>`;
 
-  $("#planCard").innerHTML = `<h3>☀️ Планирование дня</h3>
+  $("#planCard").innerHTML = `<h3>${icon("sunrise")} Планирование дня</h3>
     <p class="hint" style="margin:0">Разбери хвосты, выбери главное и оцени время, чтобы день не оказался перегружен.</p>
     ${overdue.length ? `<div class="plan-step">1 · Просроченные (${overdue.length}) <button class="btn btn-sm" data-plan-all="1" style="margin-left:8px">Всё на сегодня</button></div>
       ${overdue.map(t => row(t, `<span class="meta">${humanDate(t.due)}</span>
@@ -22,10 +22,10 @@ function renderPlan() {
         <button class="btn btn-sm" data-pd="${t.id}" data-to="${tm}">Завтра</button>
         <button class="btn btn-sm" data-pd="${t.id}" data-to="">Без срока</button>`)).join("")}` : ""}
     <div class="plan-step">${overdue.length ? 2 : 1} · План на сегодня (${todayT.length})</div>
-    ${todayT.map(t => row(t, `${estSel(t)}<button class="btn btn-sm" data-pd="${t.id}" data-to="${tm}" title="Перенести на завтра">→ Завтра</button>`)).join("") || '<p class="hint">Пока пусто — добавь задачи из списка ниже</p>'}
+    ${todayT.map(t => row(t, `${estSel(t)}<button class="btn btn-sm" data-pd="${t.id}" data-to="${tm}" title="Перенести на завтра">${icon("move")} Завтра</button>`)).join("") || '<p class="hint">Пока пусто — добавь задачи из списка ниже</p>'}
     ${cand.length ? `<div class="plan-step">Что ещё взять · по срочности</div>
-      ${cand.map(t => row(t, `<span class="meta">🧠 ${urgency(t)}${t.due ? " · " + humanDate(t.due) : ""}</span>
-        <button class="btn btn-sm" data-pd="${t.id}" data-to="${td}">＋ Сегодня</button>`)).join("")}` : ""}
+      ${cand.map(t => row(t, `<span class="meta">${icon("zap")} ${urgency(t)}${t.due ? " · " + humanDate(t.due) : ""}</span>
+        <button class="btn btn-sm" data-pd="${t.id}" data-to="${td}">${icon("plus")} Сегодня</button>`)).join("")}` : ""}
     <div class="plan-step">Загрузка</div>${loadBar()}
     <div class="plan-foot"><button class="btn btn-primary" data-plan-close="1">Готово, за работу!</button></div>`;
 }
@@ -68,7 +68,7 @@ async function timerToggle(id) {
     replaceTask(await api("POST", `/tasks/${id}/timer/stop`));
   } else {
     (await api("POST", `/tasks/${id}/timer/start`)).forEach(replaceTask);
-    toast(`⏱ Учёт времени: ${t.title}`);
+    toast(`Учёт времени: ${t.title}`);
   }
   render();
 }

@@ -31,7 +31,7 @@ async function toggleTask(id) {
   if (next) { S.tasks.push(next); S.enter.add(next.id); }
   if (task.done) {
     chime();
-    toast(next ? `Готово! Следующий повтор: ${humanDate(next.due)}` : "Задача выполнена ✓");
+    toast(next ? `Готово! Следующий повтор: ${humanDate(next.due)}` : "Задача выполнена");
     if (el) maybeCelebrate(el);
   }
   if (el && el.isConnected && S.selected !== id) {
@@ -62,7 +62,7 @@ function maybeCelebrate(el) {
       { transform: `translate(${Math.cos(ang) * dist}px, ${Math.sin(ang) * dist + 120}px) rotate(${Math.random() * 720}deg)`, opacity: 0 },
     ], { duration: 900 + Math.random() * 500, easing: "cubic-bezier(.2,.7,.4,1)" }).finished.then(() => c.remove());
   }
-  setTimeout(() => toast("Все задачи на сегодня выполнены! 🎉"), 500);
+  setTimeout(() => toast("Все задачи на сегодня выполнены!"), 500);
 }
 
 function greeting() {

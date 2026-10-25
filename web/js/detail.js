@@ -12,12 +12,12 @@ function renderDetail() {
   const td = today();
   panel.innerHTML = `<div class="detail-inner">
     <div class="d-top">
-      <button class="btn btn-sm ${t.done ? "" : "btn-primary"}" data-d="toggle">${t.done ? "↺ Вернуть" : "✓ Выполнить"}</button>
+      <button class="btn btn-sm ${t.done ? "" : "btn-primary"}" data-d="toggle">${t.done ? icon("reset") + " Вернуть" : icon("check") + " Выполнить"}</button>
       <span class="grow"></span>
-      <button class="icon-btn" data-d="focus" title="Фокус-сессия на эту задачу">🍅</button>
-      <button class="icon-btn" data-d="pin" title="Закрепить">${t.pinned ? "📍" : "📌"}</button>
+      <button class="icon-btn" data-d="focus" title="Фокус-сессия на эту задачу">${icon("target")}</button>
+      <button class="icon-btn ${t.pinned ? "on" : ""}" data-d="pin" title="${t.pinned ? "Открепить" : "Закрепить"}">${icon("pin")}</button>
       <button class="icon-btn" data-d="delete" title="Удалить">${TRASH_SVG}</button>
-      <button class="icon-btn" data-d="close" title="Закрыть (Esc)">✕</button>
+      <button class="icon-btn" data-d="close" title="Закрыть (Esc)">${icon("x")}</button>
     </div>
     <textarea class="d-title" rows="1" data-f="title">${esc(t.title)}</textarea>
 
@@ -30,7 +30,7 @@ function renderDetail() {
       </div></div>
 
     <div class="field"><label>Приоритет</label><div class="seg">
-      ${PRI_NAMES.map((n, i) => `<button class="p${i} ${t.priority === i ? "on" : ""}" data-pri="${i}">${i ? "⚑ " : ""}${n}</button>`).join("")}
+      ${PRI_NAMES.map((n, i) => `<button class="p${i} ${t.priority === i ? "on" : ""}" data-pri="${i}">${i ? icon("flag") + " " : ""}${n}</button>`).join("")}
     </div></div>
 
     <div class="field"><label>Подзадачи ${t.subtasks.length ? `· ${sd}/${t.subtasks.length}` : ""}</label>
@@ -38,8 +38,8 @@ function renderDetail() {
       <div class="subtasks">${t.subtasks.map((s, i) => `<div class="sub ${s.done ? "done" : ""}">
         <input type="checkbox" data-sub-check="${i}" ${s.done ? "checked" : ""}>
         <input class="input" data-sub-title="${i}" value="${esc(s.title)}">
-        <button class="icon-btn" data-sub-del="${i}">✕</button></div>`).join("")}
-        <input class="input" id="newSub" placeholder="＋ Добавить подзадачу и нажать Enter">
+        <button class="icon-btn" data-sub-del="${i}" title="Удалить подзадачу">${icon("x")}</button></div>`).join("")}
+        <input class="input" id="newSub" placeholder="+ Добавить подзадачу и нажать Enter">
       </div></div>
 
     <div class="field"><label>Заметки</label><textarea class="input" data-f="notes" placeholder="Детали, ссылки, мысли…">${esc(t.notes)}</textarea></div>
@@ -49,7 +49,7 @@ function renderDetail() {
       <div class="more-body">
     <div class="row">
       <div class="field"><label>Список</label><select class="input" data-f="listId">
-        <option value="">📥 Входящие</option>${S.lists.map(l => `<option value="${l.id}" ${t.listId === l.id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}
+        <option value="">Входящие</option>${S.lists.map(l => `<option value="${l.id}" ${t.listId === l.id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}
       </select></div>
       <div class="field"><label>Повтор</label><select class="input" data-f="repeat">
         ${Object.entries(REPEAT_NAMES).map(([k, n]) => `<option value="${k}" ${t.repeat === k ? "selected" : ""}>${n}</option>`).join("")}
@@ -57,15 +57,15 @@ function renderDetail() {
     </div>
 
     ${t.done ? "" : `<div class="field"><label>Статус</label><div class="seg">
-      <button class="${t.status !== "doing" ? "on" : ""}" data-status="">📝 К выполнению</button>
-      <button class="${t.status === "doing" ? "on" : ""}" data-status="doing">🚧 В работе</button>
+      <button class="${t.status !== "doing" ? "on" : ""}" data-status="">${icon("circle")} К выполнению</button>
+      <button class="${t.status === "doing" ? "on" : ""}" data-status="doing">${icon("progress")} В работе</button>
     </div></div>`}
 
     <div class="field"><label>Время</label>
       <div class="est-row">${[15, 30, 60, 120, 240].map(m => `<button class="chip ${t.estimate === m ? "on" : ""}" data-est="${m}">${fmtMin(m)}</button>`).join("")}
         <input class="input" type="number" min="0" step="5" data-f="estimate" value="${t.estimate || ""}" placeholder="мин"></div>
       <div class="timer-box">
-        ${t.done ? "" : `<button class="btn btn-sm ${t.timerStart ? "" : "btn-primary"}" data-d="timer">${t.timerStart ? "⏸ Стоп" : "▶ Старт"}</button>`}
+        ${t.done ? "" : `<button class="btn btn-sm ${t.timerStart ? "" : "btn-primary"}" data-d="timer">${t.timerStart ? icon("pause") + " Стоп" : icon("play") + " Старт"}</button>`}
         <b data-live="${t.id}">${fmtClock(spentNow(t))}</b>
         <span class="s">${t.estimate ? `затрачено из ${fmtMin(t.estimate)} по оценке` : "затрачено · оценка не задана"}</span>
       </div></div>
@@ -79,7 +79,7 @@ function renderDetail() {
       </div>
     </details>
 
-    <div class="d-foot">${t.done ? "" : `🧠 Срочность ${urgency(t)} <span class="urg">(формула Taskwarrior)</span><br>`}Создана ${new Date(t.createdAt).toLocaleString("ru")}${t.completedAt ? `<br>Выполнена ${new Date(t.completedAt).toLocaleString("ru")}` : ""}</div>
+    <div class="d-foot">${t.done ? "" : `${icon("zap")} Срочность ${urgency(t)} <span class="urg">(формула Taskwarrior)</span><br>`}Создана ${new Date(t.createdAt).toLocaleString("ru")}${t.completedAt ? `<br>Выполнена ${new Date(t.completedAt).toLocaleString("ru")}` : ""}</div>
   </div>`;
   autosize($(".d-title", panel));
 }
@@ -93,9 +93,9 @@ function moreSummary(t) {
   if (l) parts.push(esc(l.name));
   if (t.status === "doing" && !t.done) parts.push("в работе");
   if (t.estimate) parts.push(fmtMin(t.estimate));
-  if (t.repeat) parts.push("🔁 " + REPEAT_NAMES[t.repeat].toLowerCase());
-  if (t.carry === "shift") parts.push("⇉ план");
-  if (t.carry === "move") parts.push("↪ перенос");
+  if (t.repeat) parts.push(icon("repeat") + " " + REPEAT_NAMES[t.repeat].toLowerCase());
+  if (t.carry === "shift") parts.push(icon("shift") + " план");
+  if (t.carry === "move") parts.push(icon("move") + " перенос");
   if (t.tags.length) parts.push(t.tags.map(g => "#" + esc(g)).join(" "));
   return parts.join(" · ");
 }

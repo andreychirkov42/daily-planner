@@ -23,7 +23,7 @@ function renderNav() {
     const n = a.filter(t => t.listId === l.id).length;
     return `<button data-view="list:${l.id}" class="${S.view === "list:" + l.id && !S.search ? "active" : ""}">
       <i class="dot" style="background:${l.color}"></i>${esc(l.name)}
-      <span class="count">${n || ""}</span><span class="list-del" data-del-list="${l.id}" title="Удалить список">✕</span></button>`;
+      <span class="count">${n || ""}</span><span class="list-del" data-del-list="${l.id}" title="Удалить список">${icon("x")}</span></button>`;
   }).join("") + `<div id="newListSlot"></div>`;
 
   const tags = {};
@@ -64,13 +64,13 @@ function renderView() {
 
   const showSort = !["calendar", "habits", "stats", "matrix", "completed", "schedule", "sketch"].includes(v) || S.search;
   let head = showSort ? `<select class="input btn-sm" id="sortSel" style="width:auto" title="Сортировка">
-      <option value="manual">↕ Вручную</option><option value="smart">🧠 Умная (срочность)</option>
-      <option value="priority">⚑ По приоритету</option><option value="due">📅 По сроку</option>
+      <option value="manual">Вручную</option><option value="smart">Умная (срочность)</option>
+      <option value="priority">По приоритету</option><option value="due">По сроку</option>
     </select>` : "";
 
   const el = $("#view");
   if (S.search) el.innerHTML = viewSearch();
-  else if (v === "today") { el.innerHTML = viewToday(); head = progressRing() + `<button class="btn btn-sm btn-primary" data-act="plan" title="P">☀️ Спланировать день</button>` + head; }
+  else if (v === "today") { el.innerHTML = viewToday(); head = progressRing() + `<button class="btn btn-sm btn-primary" data-act="plan" title="P">${icon("sunrise")} Спланировать день</button>` + head; }
   else if (v === "board") {
     el.innerHTML = viewBoard();
     head = `<select class="input btn-sm" id="boardListSel" style="width:auto"><option value="">Все списки</option>
@@ -79,10 +79,10 @@ function renderView() {
   else if (v === "schedule") el.innerHTML = viewSchedule();
   else if (v === "sketch") { el.innerHTML = ""; sketch.mount(el); }
   else if (v === "upcoming") el.innerHTML = viewUpcoming();
-  else if (v === "inbox") el.innerHTML = viewGrouped(active().filter(t => !t.listId), "📥", "Входящие пусты — всё разобрано");
-  else if (v === "all") el.innerHTML = viewGrouped(active(), "🌿", "Нет активных задач");
-  else if (v.startsWith("list:")) el.innerHTML = viewGrouped(active().filter(t => t.listId === v.slice(5)), "🗂️", "В этом списке пока пусто");
-  else if (v.startsWith("tag:")) el.innerHTML = viewGrouped(active().filter(t => t.tags.includes(v.slice(4))), "🏷️", "Нет задач с этим тегом");
+  else if (v === "inbox") el.innerHTML = viewGrouped(active().filter(t => !t.listId), "inbox", "Входящие пусты — всё разобрано");
+  else if (v === "all") el.innerHTML = viewGrouped(active(), "list", "Нет активных задач");
+  else if (v.startsWith("list:")) el.innerHTML = viewGrouped(active().filter(t => t.listId === v.slice(5)), "list", "В этом списке пока пусто");
+  else if (v.startsWith("tag:")) el.innerHTML = viewGrouped(active().filter(t => t.tags.includes(v.slice(4))), "search", "Нет задач с этим тегом");
   else if (v === "completed") { el.innerHTML = viewCompleted(); head = `<button class="btn btn-sm btn-danger" id="clearDone">Очистить выполненные</button>`; }
   else if (v === "calendar") el.innerHTML = viewCalendar();
   else if (v === "matrix") el.innerHTML = viewMatrix();
@@ -103,33 +103,33 @@ function taskHTML(t, opts = {}) {
   const meta = [];
   if (t.due) {
     const cls = isOverdue(t) ? "late" : t.due === today() ? "today" : t.due === addDays(today(), 1) ? "soon" : "";
-    meta.push(`<span class="chip ${t.done ? "" : cls}">📅 ${humanDate(t.due)}${t.dueTime ? " · " + t.dueTime : ""}</span>`);
+    meta.push(`<span class="chip ${t.done ? "" : cls}">${icon("date")} ${humanDate(t.due)}${t.dueTime ? " · " + t.dueTime : ""}</span>`);
   }
-  if (t.repeat) meta.push(`<span class="chip" title="${REPEAT_NAMES[t.repeat]}">🔁</span>`);
-  if (t.carry && !t.done) meta.push(`<span class="chip" title="${CARRY_NAMES[t.carry]}">${t.carry === "shift" ? "⇉" : "↪"}</span>`);
-  if (t.subtasks.length) meta.push(`<span class="chip">☑ ${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}</span>`);
+  if (t.repeat) meta.push(`<span class="chip" title="${REPEAT_NAMES[t.repeat]}">${icon("repeat")}</span>`);
+  if (t.carry && !t.done) meta.push(`<span class="chip" title="${CARRY_NAMES[t.carry]}">${icon(t.carry === "shift" ? "shift" : "move")}</span>`);
+  if (t.subtasks.length) meta.push(`<span class="chip">${icon("subtasks")} ${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}</span>`);
   if (l && !opts.hideList) meta.push(`<span class="chip"><i class="dot" style="background:${l.color};margin:0"></i>${esc(l.name)}</span>`);
   for (const g of t.tags) meta.push(`<button class="chip tag" data-view="tag:${esc(g)}">#${esc(g)}</button>`);
-  if (t.notes) meta.push(`<span class="chip" title="Есть заметка">📝</span>`);
-  if (t.timerStart) meta.unshift(`<span class="chip live">⏱ <span data-live="${t.id}">${fmtClock(spentNow(t))}</span></span>`);
+  if (t.notes) meta.push(`<span class="chip" title="Есть заметка">${icon("note")}</span>`);
+  if (t.timerStart) meta.unshift(`<span class="chip live">${icon("timer")} <span data-live="${t.id}">${fmtClock(spentNow(t))}</span></span>`);
   else if (t.estimate || t.spent) {
     const sp = Math.round((t.spent || 0) / 60);
-    meta.push(`<span class="chip ${t.estimate && sp > t.estimate ? "over" : ""}" title="Затрачено / оценка">⏳ ${t.spent ? fmtMin(sp) + (t.estimate ? " / " : "") : ""}${t.estimate ? fmtMin(t.estimate) : ""}</span>`);
+    meta.push(`<span class="chip ${t.estimate && sp > t.estimate ? "over" : ""}" title="Затрачено / оценка">${icon("hourglass")} ${t.spent ? fmtMin(sp) + (t.estimate ? " / " : "") : ""}${t.estimate ? fmtMin(t.estimate) : ""}</span>`);
   }
-  if (t.status === "doing" && !t.done && S.view !== "board") meta.unshift(`<span class="chip soon">🚧 В работе</span>`);
-  if (S.sort === "smart" && !t.done) meta.push(`<span class="chip" title="Срочность по формуле Taskwarrior">🧠 ${urgency(t)}</span>`);
+  if (t.status === "doing" && !t.done && S.view !== "board") meta.unshift(`<span class="chip soon">${icon("progress")} В работе</span>`);
+  if (S.sort === "smart" && !t.done) meta.push(`<span class="chip" title="Срочность по формуле Taskwarrior">${icon("zap")} ${urgency(t)}</span>`);
   const drag = opts.drag || (S.sort === "manual" && !t.done);
 
   return `<div class="task p${t.priority} ${S.enter.has(t.id) ? "enter" : ""} ${t.done ? "done" : ""} ${t.timerStart ? "running" : ""} ${S.selected === t.id ? "selected" : ""}" data-id="${t.id}"
       ${drag ? 'draggable="true"' : ""} style="--list-color:${l ? l.color : "transparent"}">
     <button class="check" data-act="toggle" title="Отметить">${CHECK_SVG}</button>
     <div class="t-body">
-      <div class="t-title">${t.pinned ? '<span class="t-pin">📌 </span>' : ""}<span class="t-text">${esc(t.title)}</span></div>
+      <div class="t-title">${t.pinned ? '<span class="t-pin">' + icon("pin") + '</span>' : ""}<span class="t-text">${esc(t.title)}</span></div>
       ${meta.length ? `<div class="t-meta">${meta.join("")}</div>` : ""}
     </div>
     <div class="t-actions">
-      ${t.done ? "" : `<button class="icon-btn ${t.timerStart ? "on" : ""}" data-act="timer" title="Учёт времени">${t.timerStart ? "⏸" : "▶"}</button>`}
-      <button class="icon-btn" data-act="pin" title="${t.pinned ? "Открепить" : "Закрепить"}">📌</button>
+      ${t.done ? "" : `<button class="icon-btn ${t.timerStart ? "on" : ""}" data-act="timer" title="Учёт времени">${icon(t.timerStart ? "pause" : "play")}</button>`}
+      <button class="icon-btn" data-act="pin" title="${t.pinned ? "Открепить" : "Закрепить"}">${icon("pin")}</button>
       <button class="icon-btn" data-act="del" title="Удалить">${TRASH_SVG}</button>
     </div>
   </div>`;
@@ -141,7 +141,7 @@ function group(title, tasks, cls = "", opts) {
     <div class="tasks">${sortTasks(tasks).map(t => taskHTML(t, opts)).join("")}</div></div>`;
 }
 
-function empty(icon, text) { return `<div class="empty"><span class="big">${icon}</span>${text}</div>`; }
+function empty(name, text) { return `<div class="empty"><span class="big">${icon(name)}</span>${text}</div>`; }
 
 function viewToday() {
   const td = today();
@@ -150,8 +150,8 @@ function viewToday() {
   const now = a.filter(t => t.due === td);
   const done = S.tasks.filter(t => doneOn(t, td));
   let html = loadBar() + group("Просрочено", overdue, "overdue") + group("На сегодня", now) + group("Выполнено сегодня", done);
-  if (!overdue.length && !now.length) html = empty("☀️", done.length ? "Всё сделано на сегодня! Отличная работа 🎉" : "Задач на сегодня нет. Добавь первую выше 👆") + html;
-  html += `<div class="day-note"><h3>✍️ Заметка дня <span class="saved" id="noteSaved"></span></h3>
+  if (!overdue.length && !now.length) html = empty("sun", done.length ? "Всё сделано на сегодня! Отличная работа" : "Задач на сегодня нет — добавь первую строкой выше") + html;
+  html += `<div class="day-note"><h3>${icon("note")} Заметка дня <span class="saved" id="noteSaved"></span></h3>
     <textarea id="dayNote" placeholder="Мысли, итоги дня, благодарности…">${esc(S.notes[td] || "")}</textarea></div>`;
   return html;
 }
@@ -175,7 +175,7 @@ function viewUpcoming() {
     html += group(`${label} · ${fmtShort.format(parseYmd(d))}`, a.filter(t => t.due === d));
   }
   html += group("Позже", a.filter(t => t.due > addDays(td, 6)));
-  return html || empty("🗓️", "На ближайшую неделю ничего не запланировано");
+  return html || empty("upcoming", "На ближайшую неделю ничего не запланировано");
 }
 
 function dateBuckets(tasks) {
@@ -198,13 +198,13 @@ function viewGrouped(tasks, icon, emptyText) {
 
 function viewSearch() {
   const res = S.tasks.filter(t => matchesSearch(t, S.search));
-  if (!res.length) return empty("🔍", `Ничего не найдено по запросу «${esc(S.search)}»`);
+  if (!res.length) return empty("search", `Ничего не найдено по запросу «${esc(S.search)}»`);
   return group("Активные", res.filter(t => !t.done)) + group("Выполненные", res.filter(t => t.done));
 }
 
 function viewCompleted() {
   const done = S.tasks.filter(t => t.done).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
-  if (!done.length) return empty("✅", "Здесь появятся выполненные задачи");
+  if (!done.length) return empty("done", "Здесь появятся выполненные задачи");
   const byDay = new Map();
   for (const t of done) {
     const d = t.completedAt ? ymd(new Date(t.completedAt)) : "—";

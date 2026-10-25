@@ -91,6 +91,23 @@
   .pset-actions button { border: 1px solid var(--line); background: var(--card-2); border-radius: 7px; padding: 5px 12px; font-weight: 700; font-size: 12px; }
   .pset-actions .pset-save { background: var(--pm); border-color: transparent; color: #fff; }
   @keyframes ring { 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--pm) 45%, transparent); } }
+  /* линейные иконки (icons.js) */
+  .i { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: -0.18em; }
+  .i.inline { width: 1em; height: 1em; }
+  .banner-top .i { width: 16px; height: 16px; color: #ffb35c; }
+  .pgear .i { width: 16px; height: 16px; display: block; }
+  .pbtn .i { width: 15px; height: 15px; }
+  .pbtn.primary .i { width: 16px; height: 16px; stroke-width: 2.2; }
+  .btn .i { width: 15px; height: 15px; }
+  .stats .i { width: 13px; height: 13px; stroke-width: 2.2; }
+  .running .i { width: 15px; height: 15px; color: var(--green); }
+  .running button .i { width: 13px; height: 13px; }
+  .sub .i { width: 11.5px; height: 11.5px; stroke-width: 2; }
+  .title .i { width: 13px; height: 13px; color: var(--accent); }
+  .play .i { width: 14px; height: 14px; }
+  .add span .i { width: 16px; height: 16px; stroke-width: 2.2; display: block; }
+  .empty b .i { width: 34px; height: 34px; stroke-width: 1.4; margin: 0 auto 4px; display: block; }
+  .tomato { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--pm, #4f8cff); margin: 0 1.5px; vertical-align: middle; }
   .tabs { display: flex; gap: 2px; margin: 12px 14px 0; padding: 3px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
   .tabs button { flex: 1; border: 0; background: none; border-radius: 7px; padding: 7px 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--ink-2); }
   .tabs button.on { background: rgba(79,163,255,.14); color: var(--green); }
@@ -144,14 +161,14 @@
 </head>
 <body>
   <div class="banner">
-    <div class="banner-top">☀️ <span id="date"></span><button class="x" id="closeBtn" title="Скрыть (Esc)">×</button></div>
+    <div class="banner-top"><i data-i="sun"></i> <span id="date"></span><button class="x" id="closeBtn" title="Скрыть (Esc)">×</button></div>
     <div class="mood" id="mood"></div>
     <div class="bar"><i id="bar"></i></div>
   </div>
 
   <div class="brand">
     <img src="icon.png" alt="" style="width:22px;height:22px;border-radius:6px"><b>Clepsy</b>
-    <button class="pgear" id="sketchBtn" title="Холст для набросков" style="margin-left:4px">✏️</button>
+    <button class="pgear" id="sketchBtn" title="Холст для набросков" style="margin-left:4px"><i data-i="pen"></i></button>
     <div class="stats" id="stats"></div>
   </div>
   <div id="running"></div>
@@ -162,15 +179,15 @@
         <button data-pm="work" class="on">ФОКУС</button><button data-pm="short">ПЕРЕРЫВ</button><button data-pm="long">ДЛИННЫЙ</button>
       </div>
       <span class="pomo-count" id="pomoCount" title="Фокус-сессий сегодня"></span>
-      <button class="pgear" id="pomoGear" title="Настроить время">⚙</button>
+      <button class="pgear" id="pomoGear" title="Настроить время"><i data-i="settings"></i></button>
     </div>
     <div class="pomo-main">
       <div class="pomo-time" id="pomoTime" title="Нажми, чтобы ввести своё время, или крути колёсико">25:00</div>
       <div class="clock-arrows"><button type="button" data-adj="1" title="+1 минута">▲</button><button type="button" data-adj="-1" title="−1 минута">▼</button></div>
       <div class="pomo-ctrl">
-        <button class="pbtn" id="pomoReset" title="Сначала">↺</button>
-        <button class="pbtn" id="pomoSkip" title="Пропустить">⏭</button>
-        <button class="pbtn primary" id="pomoGo" title="Старт / пауза">▶</button>
+        <button class="pbtn" id="pomoReset" title="Сначала"><i data-i="reset"></i></button>
+        <button class="pbtn" id="pomoSkip" title="Пропустить"><i data-i="skip"></i></button>
+        <button class="pbtn primary" id="pomoGo" title="Старт / пауза"><i data-i="play"></i></button>
       </div>
     </div>
     <div class="pomo-bar"><i id="pomoBar"></i></div>
@@ -185,30 +202,32 @@
   </div>
 
   <form class="add" id="addForm" autocomplete="off">
-    <span>＋</span><input id="addInput" placeholder="Новая задача… «в 18:00 !3 #дом»">
+    <span><i data-i="plus"></i></span><input id="addInput" placeholder="Новая задача… «в 18:00 !3 #дом»">
   </form>
 
   <div class="label" id="label">Задачи</div>
   <div class="list" id="list"></div>
 
   <div class="foot">
-    <button class="btn" id="openBtn" title="Окно программы">🖥 Открыть</button>
-    <button class="btn" id="browserBtn" title="Открыть страницу в браузере">🌐 В браузере</button>
-    <button class="btn ghost" id="quitBtn" title="Закрыть программу">⏻ Выход</button>
+    <button class="btn" id="openBtn" title="Окно программы"><i data-i="monitor"></i> Открыть</button>
+    <button class="btn" id="browserBtn" title="Открыть страницу в браузере"><i data-i="globe"></i> В браузере</button>
+    <button class="btn ghost" id="quitBtn" title="Закрыть программу"><i data-i="power"></i> Выход</button>
   </div>
 
+<script src="icons.js"></script>
 <script src="shared.js"></script>
 <script>
 "use strict";
 const P = { tasks: [], lists: [], tab: "today" };
+hydrateIcons(); // <i data-i> в разметке → SVG
 const $ = s => document.querySelector(s);
 const CHECK = `<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 const MOODS = [
-  [0, "Начни с малого — всего одна задача 🐾"],
-  [1, "Разгон взят, котик следит за прогрессом 🐱"],
-  [50, "Половина позади, котик одобряет 😺"],
-  [80, "Финишная прямая — ещё чуть-чуть! 😼"],
-  [100, "Всё сделано! Котик в восторге 😻"],
+  [0, "Начни с малого — всего одна задача"],
+  [1, "Разгон взят, так держать"],
+  [50, "Половина позади"],
+  [80, "Финишная прямая — ещё чуть-чуть"],
+  [100, "Всё сделано на сегодня"],
 ];
 
 // функции, которые предоставляет Go-обёртка окна (в обычном браузере их нет)
@@ -258,15 +277,15 @@ function render() {
   const done = b.doneToday.length, left = b.today.length + b.late.length, total = done + left;
   const pct = total ? Math.round(done / total * 100) : 0;
   $("#date").textContent = new Intl.DateTimeFormat("ru", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
-  $("#mood").textContent = total ? MOODS.filter(([p]) => pct >= p).pop()[1] : "Свободный день — добавь планы или отдохни 🌿";
+  $("#mood").textContent = total ? MOODS.filter(([p]) => pct >= p).pop()[1] : "Свободный день — добавь планы или отдохни";
   $("#bar").style.width = pct + "%";
-  $("#stats").innerHTML = `<span class="ok" title="Выполнено сегодня">✓ ${done}</span>` +
-    (b.late.length ? `<span class="late" title="Просрочено">⚠ ${b.late.length}</span>` : "") +
-    `<span class="left" title="Осталось на сегодня">◷ ${b.today.length}</span>`;
+  $("#stats").innerHTML = `<span class="ok" title="Выполнено сегодня">${icon("check")} ${done}</span>` +
+    (b.late.length ? `<span class="late" title="Просрочено">${icon("zap")} ${b.late.length}</span>` : "") +
+    `<span class="left" title="Осталось на сегодня">${icon("clock")} ${b.today.length}</span>`;
 
   const run = P.tasks.find(t => t.timerStart);
-  $("#running").innerHTML = run ? `<div class="running">⏱ <span class="t">${esc(run.title)}</span>
-    <span class="clock" data-live="${run.id}">${clock(spentNow(run))}</span><button data-stop="${run.id}" title="Остановить">⏸</button></div>` : "";
+  $("#running").innerHTML = run ? `<div class="running">${icon("timer")} <span class="t">${esc(run.title)}</span>
+    <span class="clock" data-live="${run.id}">${clock(spentNow(run))}</span><button data-stop="${run.id}" title="Остановить">${icon("pause")}</button></div>` : "";
 
   for (const btn of document.querySelectorAll("#tabs button")) {
     const k = btn.dataset.tab;
@@ -278,23 +297,23 @@ function render() {
   if (P.tab === "today") items = items.concat(b.doneToday);
   $("#label").textContent = { today: "Задачи на сегодня", late: "Просроченные", tomorrow: "Задачи на завтра" }[P.tab];
   $("#list").innerHTML = items.length ? items.map(itemHTML).join("") :
-    `<div class="empty"><b>${P.tab === "late" ? "🎉" : "🌿"}</b>${P.tab === "late" ? "Просроченных нет" : "Пока пусто"}</div>`;
+    `<div class="empty"><b>${icon(P.tab === "late" ? "done" : "sun")}</b>${P.tab === "late" ? "Просроченных нет" : "Пока пусто"}</div>`;
 }
 
 function itemHTML(t) {
   const l = P.lists.find(l => l.id === t.listId);
   const sub = [];
-  if (t.due && t.due < today()) sub.push(`<span class="late">📅 ${t.due.split("-").reverse().slice(0, 2).join(".")}</span>`);
-  if (t.dueTime) sub.push("🕑 " + t.dueTime);
+  if (t.due && t.due < today()) sub.push(`<span class="late">${icon("date")} ${t.due.split("-").reverse().slice(0, 2).join(".")}</span>`);
+  if (t.dueTime) sub.push(icon("clock") + " " + t.dueTime);
   if (l) sub.push(`<span class="dot" style="background:${l.color}"></span>${esc(l.name)}`);
-  if (t.estimate) sub.push("⏳ " + fmtMin(t.estimate));
-  if (t.subtasks.length) sub.push(`☑ ${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}`);
+  if (t.estimate) sub.push(icon("hourglass") + " " + fmtMin(t.estimate));
+  if (t.subtasks.length) sub.push(`${icon("subtasks")} ${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}`);
   for (const g of t.tags.slice(0, 2)) sub.push("#" + esc(g));
   return `<div class="item p${t.priority} ${t.done ? "done" : ""}" data-id="${t.id}">
     <button class="check" data-toggle="${t.id}" title="Отметить">${CHECK}</button>
-    <div class="body"><div class="title">${t.pinned ? "📌 " : ""}${esc(t.title)}</div>
+    <div class="body"><div class="title">${t.pinned ? icon("pin", "inline") + " " : ""}${esc(t.title)}</div>
       <div class="sub">${sub.join(" · ") || (t.done ? "выполнено" : "без деталей")}</div></div>
-    ${t.done ? "" : `<button class="play ${t.timerStart ? "on" : ""}" data-timer="${t.id}" title="Учёт времени">${t.timerStart ? "⏸" : "▶"}</button>`}
+    ${t.done ? "" : `<button class="play ${t.timerStart ? "on" : ""}" data-timer="${t.id}" title="Учёт времени">${icon(t.timerStart ? "pause" : "play")}</button>`}
   </div>`;
 }
 
@@ -380,10 +399,10 @@ const pomo = pomoClient(st => {
   const box = $("#pomo");
   box.className = `pomo ${st.mode} ${st.running ? "is-running" : ""} ${box.classList.contains("ring") ? "ring" : ""}`;
   if (!$("#pomoTime").querySelector("input")) $("#pomoTime").textContent = fmtMMSS(pomo ? pomo.left() : st.left);
-  $("#pomoGo").textContent = st.running ? "⏸" : "▶";
+  $("#pomoGo").innerHTML = icon(st.running ? "pause" : "play");
   $("#pomoBar").style.width = (pomo ? pomo.progress() * 100 : 0) + "%";
-  $("#pomoCount").textContent = st.count ? "🍅".repeat(Math.min(st.count, 8)) + (st.count > 8 ? " " + st.count : "") : "";
-  $("#pomoLabel").textContent = st.label || (st.running ? (st.mode === "work" ? "Не отвлекайся — уведомлю, когда пора отдохнуть" : "Отдыхай: встань, разомнись, попей воды") : "Нажми ▶, чтобы начать " + POMO_NAMES[st.mode].toLowerCase());
+  $("#pomoCount").innerHTML = st.count ? '<i class="tomato"></i>'.repeat(Math.min(st.count, 8)) + (st.count > 8 ? " " + st.count : "") : "";
+  $("#pomoLabel").textContent = st.label || (st.running ? (st.mode === "work" ? "Не отвлекайся — уведомлю, когда пора отдохнуть" : "Отдыхай: встань, разомнись, попей воды") : "Нажми старт, чтобы начать " + POMO_NAMES[st.mode].toLowerCase());
   document.querySelectorAll("[data-pm]").forEach(b => {
     b.classList.toggle("on", b.dataset.pm === st.mode);
     b.textContent = { work: "ФОКУС", short: "ПЕРЕРЫВ", long: "ДЛИННЫЙ" }[b.dataset.pm] + " " + st.settings[b.dataset.pm];

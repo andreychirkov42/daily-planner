@@ -34,8 +34,8 @@ function checkDeadlines() {
     const key = t.id + t.due + t.dueTime;
     if (seen[key]) continue;
     seen[key] = 1;
-    notify("⏰ Дедлайн: " + t.title, `Срок — сегодня в ${t.dueTime}`);
-    toast(`⏰ Дедлайн: ${t.title}`);
+    notify("Дедлайн: " + t.title, `Срок — сегодня в ${t.dueTime}`);
+    toast(`Дедлайн: ${t.title}`);
   }
   safeSet("notified", JSON.stringify(seen));
   renderNav();
@@ -84,6 +84,6 @@ function onNoteInput(e) {
   noteTimer = setTimeout(async () => {
     await api("PUT", "/notes/" + td, { text });
     const s = $("#noteSaved");
-    if (s) s.textContent = "сохранено ✓";
+    if (s) s.textContent = "сохранено";
   }, 600);
 }

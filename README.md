@@ -85,3 +85,7 @@ go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --icon assets/icon
 | POST | `/api/habits/{id}/toggle/{date}` | отметка привычки |
 | GET / PUT | `/api/notes/{date}` | заметка дня |
 | GET / POST | `/api/export`, `/api/import` | резервная копия |
+
+## Благодарности
+
+Часть линейных иконок интерфейса нарисована по мотивам набора [Lucide](https://lucide.dev) (лицензия ISC).

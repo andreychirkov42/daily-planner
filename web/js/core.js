@@ -99,10 +99,10 @@ function loadBar() {
   const over = need > free;
   const p = free ? Math.min(100, need / free * 100) : need ? 100 : 0;
   return `<div class="load ${over ? "over" : ""}">
-    <span>⏳ Запланировано <b>${fmtMin(need)}</b></span>
+    <span>${icon("hourglass")} Запланировано <b>${fmtMin(need)}</b></span>
     <div class="track"><i style="width:${p}%"></i></div>
     <span>свободно до <button class="chip" data-act="dayEnd" title="Изменить конец дня">${dayEnd()}</button>: <b>${fmtMin(free)}</b></span>
-    ${over ? `<b>⚠ Перегруз на ${fmtMin(need - free)}</b>` : ""}
+    ${over ? `<b>${icon("zap")} Перегруз на ${fmtMin(need - free)}</b>` : ""}
     ${noEst ? `<span style="color:var(--ink-3)">${noEst} без оценки</span>` : ""}
   </div>`;
 }
