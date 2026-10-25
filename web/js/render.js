@@ -35,7 +35,7 @@ function renderNav() {
 const TITLES = {
   today: "Сегодня", upcoming: "Предстоящие", inbox: "Входящие", all: "Все задачи", calendar: "Календарь",
   board: "Доска", schedule: "Расписание дня", sketch: "Холст",
-  matrix: "Матрица Эйзенхауэра", habits: "Привычки", stats: "Статистика", completed: "Выполненные",
+  matrix: "Приоритеты", habits: "Привычки", stats: "Статистика", completed: "Выполненные",
 };
 
 function setView(v) {
