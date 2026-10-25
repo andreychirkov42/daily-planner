@@ -619,3 +619,9 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .burger .i { width: 20px; height: 20px; }
 .tomato { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin: 0 2px; vertical-align: middle; }
 .pomo-done { letter-spacing: 0; }
+
+/* градиентный текст (заголовок, числа статистики) при выделении становится обычным,
+   иначе выделение выглядит пустой плашкой */
+.main-head h1::selection, .card .v::selection {
+  -webkit-text-fill-color: var(--ink); color: var(--ink); background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
