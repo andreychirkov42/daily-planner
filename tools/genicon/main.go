@@ -1,6 +1,6 @@
 // genicon рисует иконку приложения: assets/icon.ico (трей и exe), assets/icon.png, web/icon.png.
 //
-//	go run ./tools/genicon                 иконка по умолчанию (кристалл)
+//	go run ./tools/genicon                 иконка по умолчанию (монограмма «Е»)
 //	go run ./tools/genicon -variant=page   другой вариант
 //	go run ./tools/genicon -preview=file   лист со всеми вариантами для сравнения
 package main
@@ -25,18 +25,22 @@ type pt struct{ x, y float64 }
 
 // variants — варианты иконки; у каждого своя функция цвета пикселя в координатах 0..1
 var variants = map[string]func(x, y, px float64) color.NRGBA{
-	"star":     star,     // гранёная четырёхлучевая звезда-ориентир
-	"bookmark": bookmark, // лента-закладка ежедневника
-	"sunrise":  sunrise,  // солнце над горизонтом — план на день
-	"layers":   layers,   // стопка карточек-задач
-	"crystal":  crystal,  // гранёная галочка (прежний вариант)
-	"page":     page,
-	"glow":     glow,
+	"monogram":  monogram,  // буква «Е» из строк списка и тёплая точка «сегодня»
+	"stripes":   stripes,   // ретро-солнце с вырезанными полосами
+	"hourglass": hourglass, // гранёные песочные часы с тёплым песком
+	"gem":       gem,       // огранённый камень с искрой
+	"star":      star,      // гранёная четырёхлучевая звезда-ориентир
+	"bookmark":  bookmark,  // лента-закладка ежедневника
+	"sunrise":   sunrise,   // солнце над горизонтом — план на день
+	"layers":    layers,    // стопка карточек-задач
+	"crystal":   crystal,   // гранёная галочка (прежний вариант)
+	"page":      page,
+	"glow":      glow,
 }
-var order = []string{"star", "bookmark", "sunrise", "layers"}
+var order = []string{"monogram", "stripes", "hourglass", "gem", "sunrise"}
 
 func main() {
-	variant := flag.String("variant", "star", "вариант: star, bookmark, sunrise, layers, crystal, page, glow")
+	variant := flag.String("variant", "monogram", "вариант: monogram, stripes, hourglass, gem, star, bookmark, sunrise, layers, crystal, page, glow")
 	preview := flag.String("preview", "", "сохранить лист сравнения вариантов в этот PNG")
 	flag.Parse()
 
@@ -439,6 +443,151 @@ func layers(x, y, px float64) color.NRGBA {
 	}
 	if inPoly(x, y, shapes[0]) {
 		return lerp(rgb(0x2448c8), rgb(0x1a2f8f), (x-0.2)/0.6)
+	}
+	return c
+}
+
+// ---------- второй круг: сильный силуэт, объём от света ----------
+
+var (
+	warmTop = rgb(0xffd66b)
+	warmBot = rgb(0xff6a5a)
+)
+
+// capsule — расстояние до отрезка с закруглёнными концами
+func inCapsule(x, y float64, a, b pt, r float64) bool { return segDist(x, y, a, b) <= r }
+
+// blueBody — объёмная заливка: светлее сверху-слева, с бликом у верхнего края фигуры
+func blueBody(x, y, top float64) color.NRGBA {
+	c := lerp(rgb(0x8fd0ff), rgb(0x2f5fe8), (x*0.4+y*0.6-0.15)/0.7)
+	if y-top < 0.03 {
+		c = lerp(c, rgb(0xe6f5ff), 0.45*(1-(y-top)/0.03))
+	}
+	return c
+}
+
+func glowAt(c color.NRGBA, x, y, cx, cy, r float64, col color.NRGBA, a float64) color.NRGBA {
+	return over(c, col, a*math.Max(0, 1-math.Hypot(x-cx, y-cy)/r))
+}
+
+func monogram(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	const r = 0.068
+	sx := 0.32
+	bars := [][2]pt{
+		{{sx, 0.27}, {sx, 0.73}},   // вертикаль
+		{{sx, 0.27}, {0.69, 0.27}}, // верхняя строка
+		{{sx, 0.5}, {0.55, 0.5}},   // средняя — короче, рядом точка «сегодня»
+		{{sx, 0.73}, {0.69, 0.73}}, // нижняя строка
+	}
+	dot := pt{0.715, 0.5}
+	c = glowAt(c, x, y, dot.x, dot.y, 0.22, rgb(0xff8a4a), 0.35)
+	// тень
+	for _, b := range bars {
+		if inCapsule(x, y-0.025, b[0], b[1], r) {
+			c = over(c, rgb(0x02040a), 0.5)
+		}
+	}
+	for _, b := range bars {
+		if inCapsule(x, y, b[0], b[1], r) {
+			return blueBody(x, y, math.Min(b[0].y, b[1].y)-r)
+		}
+	}
+	if d := math.Hypot(x-dot.x, y-dot.y); d < 0.072 {
+		cc := lerp(warmTop, warmBot, (y-dot.y+0.072)/0.144)
+		if d < 0.03 && y < dot.y {
+			cc = lerp(cc, rgb(0xfff6d8), 0.5)
+		}
+		return cc
+	}
+	return c
+}
+
+func stripes(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	cx, cy, r := 0.5, 0.52, 0.29
+	c = glowAt(c, x, y, cx, cy, 0.48, rgb(0xff7a59), 0.28)
+	if math.Hypot(x-cx, y-cy) > r {
+		return c
+	}
+	// вырезанные полосы в нижней половине: чем ниже, тем шире
+	for _, band := range [][2]float64{{0.585, 0.012}, {0.645, 0.02}, {0.705, 0.028}, {0.765, 0.036}} {
+		if y > band[0] && y < band[0]+band[1] {
+			return c
+		}
+	}
+	col := lerp(warmTop, rgb(0xff4f7a), (y-(cy-r))/(2*r))
+	// мягкий блик сверху-слева
+	return glowAt(col, x, y, cx-0.1, cy-0.15, 0.2, rgb(0xfff3c4), 0.45)
+}
+
+func hourglass(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	topBar := [2]pt{{0.3, 0.2}, {0.7, 0.2}}
+	botBar := [2]pt{{0.3, 0.8}, {0.7, 0.8}}
+	upL := []pt{{0.34, 0.235}, {0.5, 0.235}, {0.5, 0.5}}
+	upR := []pt{{0.5, 0.235}, {0.66, 0.235}, {0.5, 0.5}}
+	loL := []pt{{0.5, 0.5}, {0.5, 0.765}, {0.34, 0.765}}
+	loR := []pt{{0.5, 0.5}, {0.66, 0.765}, {0.5, 0.765}}
+	c = glowAt(c, x, y, 0.5, 0.66, 0.3, rgb(0xff8a4a), 0.25)
+	c = withShadow(c, x, y, [][]pt{upL, upR, loL, loR}, 0.5)
+	for _, b := range [][2]pt{topBar, botBar} {
+		if inCapsule(x, y, b[0], b[1], 0.04) {
+			return blueBody(x, y, b[0].y-0.04)
+		}
+	}
+	sand := func(cc color.NRGBA) color.NRGBA { return lerp(warmTop, warmBot, (y-0.4)/0.4) }
+	inside := inPoly(x, y, upL) || inPoly(x, y, upR) || inPoly(x, y, loL) || inPoly(x, y, loR)
+	if !inside {
+		return c
+	}
+	// песок: горка внизу и остаток наверху, тонкая струйка посередине
+	if (y > 0.66 && inPoly(x, y, append(loL[:0:0], loL...))) || (y > 0.66 && inPoly(x, y, loR)) ||
+		(y > 0.4 && y < 0.5 && (inPoly(x, y, upL) || inPoly(x, y, upR))) || (math.Abs(x-0.5) < 0.008 && y > 0.5 && y < 0.67) {
+		return sand(c)
+	}
+	glass := lerp(rgb(0x6fb6ff), rgb(0x2a55d6), (y-0.2)/0.6)
+	if x < 0.5 {
+		glass = lerp(glass, rgb(0xd8efff), 0.28)
+	}
+	return over(c, glass, 0.78)
+}
+
+func gem(x, y, px float64) color.NRGBA {
+	c, ok := darkTile(x, y, px)
+	if !ok {
+		return c
+	}
+	// классическая огранка: «корона» сверху и «павильон» снизу
+	a, b, cc, d := pt{0.25, 0.37}, pt{0.38, 0.22}, pt{0.62, 0.22}, pt{0.75, 0.37}
+	bot := pt{0.5, 0.8}
+	m1, m2 := pt{0.44, 0.37}, pt{0.56, 0.37}
+	tris := [][]pt{
+		{a, b, m1}, {b, cc, m1}, {m1, cc, m2}, {cc, d, m2}, // корона
+		{a, m1, bot}, {m1, m2, bot}, {m2, d, bot}, // павильон
+	}
+	tone := []color.NRGBA{rgb(0xb8e6ff), rgb(0x8cc8ff), rgb(0xd2f0ff), rgb(0x5e9bff), rgb(0x4f86ff), rgb(0x7fb4ff), rgb(0x1f45c6)}
+	c = glowAt(c, x, y, 0.5, 0.5, 0.45, rgb(0x2f6bff), 0.25)
+	c = withShadow(c, x, y, tris, 0.55)
+	for i, tr := range tris {
+		if inPoly(x, y, tr) {
+			col := lerp(tone[i], rgb(0x1b3aa8), (y-0.22)/0.9)
+			return col
+		}
+	}
+	// тёплая искра справа сверху
+	sp := pt{0.73, 0.24}
+	if dx, dy := math.Abs(x-sp.x), math.Abs(y-sp.y); dx*dy < 0.0004 && dx < 0.07 && dy < 0.07 {
+		return lerp(rgb(0xfff2c0), warmTop, (dx+dy)/0.1)
 	}
 	return c
 }
