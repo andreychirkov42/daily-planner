@@ -13,7 +13,7 @@ const pomo = (() => {
       b.innerHTML = { work: "Фокус", short: "Перерыв", long: "Длинный" }[b.dataset.mode] + "<small>" + st.settings[b.dataset.mode] + " мин</small>";
     });
     $("#pomoDone").textContent = "🍅".repeat(Math.min(st.count, 12));
-    document.title = st.running ? `${fmtMMSS(c.left())} · ${POMO_NAMES[st.mode]}` : $("#viewTitle").textContent + " · Flask";
+    document.title = st.running ? `${fmtMMSS(c.left())} · ${POMO_NAMES[st.mode]}` : $("#viewTitle").textContent + " · Clepsy";
   }
   function finished(st) {
     // звук играет мини-панель в трее, здесь только подсказка

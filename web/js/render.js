@@ -56,7 +56,7 @@ function renderView() {
   if (S.search) title = "Поиск";
   $("#viewTitle").textContent = title;
   $("#eyebrow").textContent = greeting() + " · " + fmtLong.format(new Date());
-  document.title = title + " · Flask";
+  document.title = title + " · Clepsy";
 
   const noAdd = ["habits", "stats", "completed", "matrix", "sketch"].includes(v) && !S.search;
   $("#quickAdd").style.display = noAdd ? "none" : "";
