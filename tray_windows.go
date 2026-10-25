@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -77,9 +80,6 @@ const (
 	dwmCaptionColor = 35
 	dwmTextColor    = 36
 	dwmRound        = 2
-	autostartKey    = `Software\Microsoft\Windows\CurrentVersion\Run`
-	autostartName   = "DailyPlanner"
-	approvedKey     = `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`
 )
 
 type point struct{ X, Y int32 }
@@ -494,68 +494,133 @@ func trayTooltip(s *Store, pomo *Pomodoro) string {
 	return tip
 }
 
-// autostartEnabled учитывает и запись в Run, и флаг из «Автозагрузки» диспетчера задач.
+// ---- автозапуск ----
+// Два независимых способа, чтобы запуск при входе в Windows не зависел от одного механизма:
+// запись в реестре Run и ярлык в папке «Автозагрузка». Если сработают оба, вторая копия
+// увидит занятый порт и тихо закроется (флаг -autostart).
+
+const (
+	runKey        = `Software\Microsoft\Windows\CurrentVersion\Run`
+	approvedRun   = `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`
+	approvedLinks = `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder`
+	autostartName = "Clepsy"
+	legacyName    = "DailyPlanner" // имя записи в прежних версиях
+	startupLink   = "Clepsy.lnk"
+)
+
+// «включено» для StartupApproved; без этого флага Windows 11 может пропустить новую запись
+var approvedOn = []byte{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+func startupLinkPath() string {
+	return filepath.Join(os.Getenv("APPDATA"), `Microsoft\Windows\Start Menu\Programs\Startup`, startupLink)
+}
+
+// autostartEnabled: есть запись в Run и её не выключили в «Автозагрузке» диспетчера задач.
 func autostartEnabled() bool {
-	k, err := registry.OpenKey(registry.CURRENT_USER, autostartKey, registry.QUERY_VALUE)
+	for _, name := range []string{autostartName, legacyName} {
+		if regString(runKey, name) != "" {
+			return !disabledInTaskManager(approvedRun, name)
+		}
+	}
+	return false
+}
+
+func disabledInTaskManager(key, name string) bool {
+	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE)
 	if err != nil {
 		return false
 	}
 	defer k.Close()
-	if _, _, err = k.GetStringValue(autostartName); err != nil {
-		return false
-	}
-	a, err := registry.OpenKey(registry.CURRENT_USER, approvedKey, registry.QUERY_VALUE)
-	if err != nil {
-		return true
-	}
-	defer a.Close()
-	flag, _, err := a.GetBinaryValue(autostartName)
-	return err != nil || len(flag) == 0 || flag[0]&1 == 0 // нечётный первый байт — «отключено»
+	flag, _, err := k.GetBinaryValue(name)
+	return err == nil && len(flag) > 0 && flag[0]&1 == 1 // нечётный первый байт — «отключено»
 }
 
-func setAutostart(on bool) error {
-	k, err := registry.OpenKey(registry.CURRENT_USER, autostartKey, registry.SET_VALUE)
+func regString(key, name string) string {
+	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE)
+	if err != nil {
+		return ""
+	}
+	defer k.Close()
+	v, _, _ := k.GetStringValue(name)
+	return v
+}
+
+func setRegValue(key, name string, value any) error {
+	k, _, err := registry.CreateKey(registry.CURRENT_USER, key, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer k.Close()
-	if !on {
-		_ = setApproved(nil)
-		if err := k.DeleteValue(autostartName); err != nil && err != registry.ErrNotExist {
+	switch v := value.(type) {
+	case nil:
+		if err := k.DeleteValue(name); err != nil && err != registry.ErrNotExist {
 			return err
 		}
 		return nil
+	case string:
+		return k.SetStringValue(name, v)
+	case []byte:
+		return k.SetBinaryValue(name, v)
+	}
+	return nil
+}
+
+func setAutostart(on bool) error {
+	// старое имя записи убираем в любом случае
+	_ = setRegValue(runKey, legacyName, nil)
+	_ = setRegValue(approvedRun, legacyName, nil)
+	if !on {
+		_ = setRegValue(approvedRun, autostartName, nil)
+		_ = setRegValue(approvedLinks, startupLink, nil)
+		_ = os.Remove(startupLinkPath())
+		return setRegValue(runKey, autostartName, nil)
 	}
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	if err := k.SetStringValue(autostartName, `"`+exe+`" -autostart`); err != nil {
+	if err := setRegValue(runKey, autostartName, `"`+exe+`" -autostart`); err != nil {
 		return err
 	}
-	// Без явного «включено» в StartupApproved Windows 11 может пропустить новую запись в Run.
-	return setApproved([]byte{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-}
-
-// setApproved пишет флаг автозагрузки (nil — удалить запись).
-func setApproved(flag []byte) error {
-	a, _, err := registry.CreateKey(registry.CURRENT_USER, approvedKey, registry.SET_VALUE)
-	if err != nil {
+	if err := setRegValue(approvedRun, autostartName, approvedOn); err != nil {
 		return err
 	}
-	defer a.Close()
-	if flag == nil {
-		return a.DeleteValue(autostartName)
+	if err := writeStartupLink(exe); err != nil {
+		log.Printf("ярлык автозагрузки: %v", err) // запись в Run уже есть — не критично
+		return nil
 	}
-	return a.SetBinaryValue(autostartName, flag)
+	return setRegValue(approvedLinks, startupLink, approvedOn)
 }
 
-// repairAutostart чинит запись, если exe перенесли в другую папку или флаг одобрения потерялся.
+// writeStartupLink создаёт ярлык в «Автозагрузке» через WScript.Shell (без окна консоли).
+func writeStartupLink(exe string) error {
+	ps := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s');$s.TargetPath='%s';$s.Arguments='-autostart';$s.WorkingDirectory='%s';$s.Description='Clepsy';$s.Save()`,
+		psQuote(startupLinkPath()), psQuote(exe), psQuote(filepath.Dir(exe)))
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%v: %s", err, out)
+	}
+	return nil
+}
+
+func psQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
+
+// repairAutostart при каждом старте: переносит старую запись на новое имя, чинит путь,
+// если exe перенесли, и восстанавливает ярлык. Выключенный пользователем автозапуск не трогает.
 func repairAutostart() {
 	if !autostartEnabled() {
 		return
 	}
-	_ = setAutostart(true)
+	exe, _ := os.Executable()
+	want := `"` + exe + `" -autostart`
+	_, linkErr := os.Stat(startupLinkPath())
+	if regString(runKey, autostartName) == want && regString(runKey, legacyName) == "" && linkErr == nil {
+		return // всё уже на месте — не запускаем PowerShell зря
+	}
+	if err := setAutostart(true); err != nil {
+		log.Printf("автозапуск: %v", err)
+	}
 }
 
 // runMessageLoop нужен, только если WebView2 не запустился.
