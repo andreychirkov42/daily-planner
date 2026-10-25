@@ -489,3 +489,30 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .ico-svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
 [data-act="del"]:hover, [data-d="delete"]:hover, [data-del-habit]:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .field .hint { margin: 2px 2px 0; line-height: 1.4; }
+
+/* ---------- настройка таймера ---------- */
+.pomo-top { display: flex; align-items: center; gap: 4px; }
+.pomo-top .pomo-modes { flex: 1; }
+.pomo-modes button { font-size: 11px; white-space: nowrap; }
+.pomo-gear { min-width: 26px; height: 26px; font-size: 14px; }
+.pomo-gear.on { background: var(--panel); color: var(--accent); }
+.pomo-time { cursor: text; border-radius: 10px; transition: background .15s; }
+.pomo-time:hover { background: color-mix(in srgb, var(--panel) 60%, transparent); }
+.clock-input { width: 100%; max-width: 150px; text-align: center; font: inherit; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; outline: 0; }
+.pset { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.pset-presets { display: flex; gap: 4px; }
+.pset-chip { flex: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 3px 0; font-size: 11.5px; font-weight: 800; color: var(--ink-2); }
+.pset-chip.on { border-color: var(--accent); color: var(--accent); }
+.pset-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.pset-row span { flex: 1; }
+.pset-row input[type=number] { width: 54px; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 3px 4px; text-align: center; font-weight: 700; outline: 0; }
+.pset-row input[type=number]:focus { border-color: var(--accent); }
+.pset-row em { font-style: normal; width: 50px; color: var(--ink-3); font-size: 11px; }
+.pset-check { cursor: pointer; }
+.pset-check input { accent-color: var(--accent); }
+.pset-err { color: var(--danger); font-size: 11.5px; }
+.pset-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.pset-actions button { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 4px 10px; font-weight: 700; font-size: 12px; }
+.pset-actions .pset-save { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; }
+.pomo-modes button { line-height: 1.15; padding: 3px 0; }
+.pomo-modes button small { display: block; font-size: 9.5px; font-weight: 600; opacity: .75; }

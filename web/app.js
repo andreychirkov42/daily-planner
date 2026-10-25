@@ -1133,10 +1133,13 @@ async function onSidebarClick(e) {
 const pomo = (() => {
   let c;
   function draw(st) {
-    $("#pomoTime").textContent = fmtMMSS(c.left());
+    if (!$("#pomoTime").querySelector("input")) $("#pomoTime").textContent = fmtMMSS(c.left());
     $("#pomoStart").textContent = st.running ? "Пауза" : st.left < st.durations[st.mode] ? "Дальше" : "Старт";
     $("#pomoLabel").textContent = st.label || { work: "Время сосредоточиться", short: "Короткий перерыв", long: "Длинный перерыв" }[st.mode];
-    $$(".pomo-modes button").forEach(b => b.classList.toggle("on", b.dataset.mode === st.mode));
+    $$(".pomo-modes button").forEach(b => {
+      b.classList.toggle("on", b.dataset.mode === st.mode);
+      b.innerHTML = { work: "Фокус", short: "Перерыв", long: "Длинный" }[b.dataset.mode] + "<small>" + st.settings[b.dataset.mode] + " мин</small>";
+    });
     $("#pomoDone").textContent = "🍅".repeat(Math.min(st.count, 12));
     document.title = st.running ? `${fmtMMSS(c.left())} · ${POMO_NAMES[st.mode]}` : $("#viewTitle").textContent + " · Ежедневник";
   }
@@ -1151,6 +1154,17 @@ const pomo = (() => {
       $("#pomoStart").onclick = () => c.toggle();
       $("#pomoReset").onclick = () => c.reset();
       $$(".pomo-modes button").forEach(b => (b.onclick = () => c.mode(b.dataset.mode)));
+      $("#pomoTime").onclick = () => editClock($("#pomoTime"), c);
+      const box = $("#pomoSettings");
+      const close = () => { box.hidden = true; $("#pomoGear").classList.remove("on"); };
+      $("#pomoGear").onclick = () => {
+        if (!box.hidden) return close();
+        box.innerHTML = pomoSettingsHTML(c.state().settings);
+        box.hidden = false;
+        $("#pomoGear").classList.add("on");
+        box.querySelector("[data-pset=work]").focus();
+      };
+      bindPomoSettings(box, c, close);
     },
     focus(text) { c.mode("work", "🎯 " + text).then(() => c.start()); toast("Фокус-сессия запущена"); },
   };

@@ -84,6 +84,7 @@ type Data struct {
 	Notes  map[string]string `json:"notes"` // дата -> заметка дня
 	Pomos  map[string]int    `json:"pomos"` // дата -> завершённых фокус-сессий
 	Series []*Series         `json:"series"`
+	Pomo   *PomoSettings     `json:"pomoSettings,omitempty"`
 }
 
 type Store struct {
@@ -98,6 +99,7 @@ func NewStore(path string) (*Store, error) {
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		s.data = defaultData()
+		s.normalize() // все словари должны существовать и в новом файле
 		return s, s.saveLocked()
 	case err != nil:
 		return nil, err
@@ -604,6 +606,23 @@ func (s *Store) PomoCount(date string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.data.Pomos[date]
+}
+
+func (s *Store) PomoSettings() *PomoSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.data.Pomo == nil {
+		return nil
+	}
+	cp := *s.data.Pomo
+	return &cp
+}
+
+func (s *Store) SetPomoSettings(p PomoSettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data.Pomo = &p
+	return s.saveLocked()
 }
 
 func (s *Store) AddPomo(date string) error {

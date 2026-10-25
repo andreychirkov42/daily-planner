@@ -112,6 +112,40 @@ func TestRolloverMoveAndShift(t *testing.T) {
 	}
 }
 
+func TestPomodoroCustomSettings(t *testing.T) {
+	s := newTestStore(t)
+	p := NewPomodoro(s)
+	if st := p.State(); st.Left != 25*60 {
+		t.Fatalf("по умолчанию 25 минут, получили %d с", st.Left)
+	}
+	if _, err := p.SetSettings(PomoSettings{Work: 50, Short: 10, Long: 30, LongEvery: 2, AutoBreak: false}); err != nil {
+		t.Fatal(err)
+	}
+	if st := p.State(); st.Left != 50*60 || st.Durations["short"] != 600 {
+		t.Fatalf("новые длительности не применились: %+v", st)
+	}
+	if _, err := p.SetSettings(PomoSettings{Work: 0, Short: 5, Long: 15, LongEvery: 4}); err == nil {
+		t.Fatal("ноль минут фокуса должен отклоняться")
+	}
+	// ручная правка часов
+	if st, _ := p.Do("set", "", "", 12.5); st.Left != 750 {
+		t.Fatalf("set 12.5 мин: осталось %d с", st.Left)
+	}
+	// после двух фокусов — длинный перерыв, и без автозапуска
+	p.Do("start", "", "", 0)
+	p.finish(true)
+	p.Do("mode", "work", "", 0)
+	p.finish(true)
+	if st := p.State(); st.Mode != "long" || st.Running {
+		t.Fatalf("ожидали длинный перерыв на паузе, получили mode=%s running=%v", st.Mode, st.Running)
+	}
+	// настройки сохраняются в data.json
+	s2, _ := NewStore(s.path)
+	if got := NewPomodoro(s2).State().Settings.Work; got != 50 {
+		t.Fatalf("после перезапуска фокус %d мин, ожидали 50", got)
+	}
+}
+
 func TestGuardBlocksCrossSite(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	h := guard(ok)

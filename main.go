@@ -126,11 +126,26 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 		writeJSON(w, http.StatusOK, pomo.State())
 	})
 	mux.HandleFunc("POST /api/pomodoro", func(w http.ResponseWriter, r *http.Request) {
-		var body struct{ Action, Mode, Label string }
+		var body struct {
+			Action, Mode, Label string
+			Minutes             float64
+		}
 		if !readJSON(w, r, &body) {
 			return
 		}
-		st, err := pomo.Do(body.Action, body.Mode, body.Label)
+		st, err := pomo.Do(body.Action, body.Mode, body.Label, body.Minutes)
+		if err != nil {
+			httpError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, st)
+	})
+	mux.HandleFunc("PUT /api/pomodoro/settings", func(w http.ResponseWriter, r *http.Request) {
+		var set PomoSettings
+		if !readJSON(w, r, &set) {
+			return
+		}
+		st, err := pomo.SetSettings(set)
 		if err != nil {
 			httpError(w, http.StatusBadRequest, err.Error())
 			return

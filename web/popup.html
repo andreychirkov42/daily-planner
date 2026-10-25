@@ -57,6 +57,26 @@
   .pomo-bar i { display: block; height: 100%; width: 0; background: var(--pm); border-radius: 4px; transition: width .5s linear; }
   .pomo-label { font-size: 11.5px; color: var(--ink-2); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 16px; }
   .pomo.ring { animation: ring .6s ease 3; }
+  .pomo-time { cursor: text; border-radius: 8px; padding: 0 4px; margin-left: -4px; transition: background .15s; }
+  .pomo-time:hover { background: var(--card-2); }
+  .clock-input { width: 130px; font: inherit; color: var(--pm); background: var(--bg); border: 1px solid var(--pm); border-radius: 8px; padding: 0 6px; outline: 0; }
+  .pgear { border: 0; background: none; color: var(--ink-3); font-size: 15px; padding: 2px 4px; border-radius: 6px; }
+  .pgear:hover, .pgear.on { color: var(--ink); background: var(--card-2); }
+  .pset { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+  .pset-presets { display: flex; gap: 4px; margin-bottom: 2px; }
+  .pset-chip { flex: 1; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 4px 0; font-size: 11.5px; font-weight: 800; color: var(--ink-2); }
+  .pset-chip.on { border-color: var(--pm); color: var(--pm); }
+  .pset-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .pset-row span { flex: 1; }
+  .pset-row input[type=number] { width: 58px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; text-align: center; font-weight: 700; outline: 0; user-select: text; }
+  .pset-row input[type=number]:focus { border-color: var(--pm); }
+  .pset-row em { font-style: normal; width: 52px; color: var(--ink-3); font-size: 11.5px; }
+  .pset-check { cursor: pointer; }
+  .pset-check input { accent-color: var(--pm); width: 15px; height: 15px; }
+  .pset-err { color: var(--p3); font-size: 11.5px; min-height: 0; }
+  .pset-actions { display: flex; justify-content: flex-end; gap: 6px; }
+  .pset-actions button { border: 1px solid var(--line); background: var(--card-2); border-radius: 7px; padding: 5px 12px; font-weight: 700; font-size: 12px; }
+  .pset-actions .pset-save { background: var(--pm); border-color: transparent; color: #fff; }
   @keyframes ring { 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--pm) 45%, transparent); } }
   .tabs { display: flex; gap: 2px; margin: 12px 14px 0; padding: 3px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
   .tabs button { flex: 1; border: 0; background: none; border-radius: 7px; padding: 7px 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--ink-2); }
@@ -70,7 +90,7 @@
   .add input::placeholder { color: var(--ink-3); }
 
   .label { padding: 12px 16px 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; color: var(--ink-3); text-transform: uppercase; }
-  .list { flex: 1; overflow-y: auto; padding: 0 10px 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px 14px; display: flex; flex-direction: column; gap: 6px; }
   .list::-webkit-scrollbar { width: 6px; }
   .list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
 
@@ -128,9 +148,10 @@
         <button data-pm="work" class="on">ФОКУС</button><button data-pm="short">ПЕРЕРЫВ</button><button data-pm="long">ДЛИННЫЙ</button>
       </div>
       <span class="pomo-count" id="pomoCount" title="Фокус-сессий сегодня"></span>
+      <button class="pgear" id="pomoGear" title="Настроить время">⚙</button>
     </div>
     <div class="pomo-main">
-      <div class="pomo-time" id="pomoTime">25:00</div>
+      <div class="pomo-time" id="pomoTime" title="Нажми, чтобы ввести своё время">25:00</div>
       <div class="pomo-ctrl">
         <button class="pbtn" id="pomoReset" title="Сначала">↺</button>
         <button class="pbtn" id="pomoSkip" title="Пропустить">⏭</button>
@@ -139,6 +160,7 @@
     </div>
     <div class="pomo-bar"><i id="pomoBar"></i></div>
     <div class="pomo-label" id="pomoLabel"></div>
+    <div id="pomoSettings" hidden></div>
   </div>
 
   <div class="tabs" id="tabs">
@@ -284,6 +306,7 @@ document.addEventListener("click", async e => {
   if (el.id === "browserBtn") { openInBrowser(""); return; }
   if (d.pm) { pomo.mode(d.pm); return; }
   if (el.id === "pomoGo") { pomo.toggle(); return; }
+  if (el.id === "pomoGear") { toggleSettings(); return; }
   if (el.id === "pomoReset") { pomo.reset(); return; }
   if (el.id === "pomoSkip") { pomo.skip(); return; }
   if (el.id === "quitBtn") { quitApp(); return; }
@@ -310,7 +333,7 @@ $("#addForm").addEventListener("submit", async e => {
   load();
 });
 
-document.addEventListener("keydown", e => { if (e.key === "Escape") hidePopup(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !e.target.closest(".pomo")) hidePopup(); });
 document.addEventListener("contextmenu", e => { if (!e.target.closest("input")) e.preventDefault(); });
 
 setInterval(() => {
@@ -340,18 +363,34 @@ function beep() {
 const pomo = pomoClient(st => {
   const box = $("#pomo");
   box.className = `pomo ${st.mode} ${st.running ? "is-running" : ""} ${box.classList.contains("ring") ? "ring" : ""}`;
-  $("#pomoTime").textContent = fmtMMSS(pomo ? pomo.left() : st.left);
+  if (!$("#pomoTime").querySelector("input")) $("#pomoTime").textContent = fmtMMSS(pomo ? pomo.left() : st.left);
   $("#pomoGo").textContent = st.running ? "⏸" : "▶";
   $("#pomoBar").style.width = (pomo ? pomo.progress() * 100 : 0) + "%";
   $("#pomoCount").textContent = st.count ? "🍅".repeat(Math.min(st.count, 8)) + (st.count > 8 ? " " + st.count : "") : "";
   $("#pomoLabel").textContent = st.label || (st.running ? (st.mode === "work" ? "Не отвлекайся — уведомлю, когда пора отдохнуть" : "Отдыхай: встань, разомнись, попей воды") : "Нажми ▶, чтобы начать " + POMO_NAMES[st.mode].toLowerCase());
-  document.querySelectorAll("[data-pm]").forEach(b => b.classList.toggle("on", b.dataset.pm === st.mode));
+  document.querySelectorAll("[data-pm]").forEach(b => {
+    b.classList.toggle("on", b.dataset.pm === st.mode);
+    b.textContent = { work: "ФОКУС", short: "ПЕРЕРЫВ", long: "ДЛИННЫЙ" }[b.dataset.pm] + " " + st.settings[b.dataset.pm];
+  });
 }, st => {
   beep();
   const box = $("#pomo");
   box.classList.remove("ring"); void box.offsetWidth; box.classList.add("ring");
   setTimeout(() => box.classList.remove("ring"), 2000);
 });
+
+$("#pomoTime").addEventListener("click", () => editClock($("#pomoTime"), pomo));
+
+function toggleSettings() {
+  const box = $("#pomoSettings");
+  const open = box.hidden;
+  box.hidden = !open;
+  $("#pomoGear").classList.toggle("on", open);
+  if (!open) return;
+  box.innerHTML = pomoSettingsHTML(pomo.state().settings);
+  box.querySelector("[data-pset=work]").focus();
+}
+bindPomoSettings($("#pomoSettings"), pomo, () => { $("#pomoSettings").hidden = true; $("#pomoGear").classList.remove("on"); });
 
 // вызывается из Go при каждом показе окна
 window.onPopupShow = () => { load(); pomo.refresh(); };

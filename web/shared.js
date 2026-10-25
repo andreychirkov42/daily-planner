@@ -111,8 +111,93 @@ function pomoClient(onChange, onFinish) {
     reset: () => call({ action: "reset" }),
     skip: () => call({ action: "skip" }),
     mode: (mode, label) => call({ action: "mode", mode, label: label || "" }),
+    set: minutes => call({ action: "set", minutes }),
+    async saveSettings(set) {
+      const r = await fetch("/api/pomodoro/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(set) });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error || "не удалось сохранить");
+      apply(body);
+    },
     refresh: () => call(),
   };
 }
 
 const TRASH_SVG = `<svg class="ico-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12a2 2 0 0 0 2 1.8h7a2 2 0 0 0 2-1.8l1-12M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7"/></svg>`;
+
+// parseClock понимает «25», «12:30», «1:05:00», «7,5» и возвращает минуты (или NaN).
+function parseClock(str) {
+  const v = String(str).trim().replace(",", ".");
+  if (/^\d+(\.\d+)?$/.test(v)) return parseFloat(v);
+  const parts = v.split(":").map(Number);
+  if (parts.length < 2 || parts.length > 3 || parts.some(n => !Number.isFinite(n) || n < 0)) return NaN;
+  const [h, m, sec] = parts.length === 3 ? parts : [0, ...parts];
+  return h * 60 + m + sec / 60;
+}
+
+const POMO_PRESETS = [[25, 5, 15], [50, 10, 20], [90, 15, 30], [15, 3, 10]];
+
+// форма настроек таймера; одинаковая для окна программы и мини-панели
+function pomoSettingsHTML(set) {
+  const num = (k, label, max, unit) => `<label class="pset-row"><span>${label}</span>
+    <input type="number" min="1" max="${max}" step="1" data-pset="${k}" value="${set[k]}"><em>${unit}</em></label>`;
+  return `<div class="pset">
+    <div class="pset-presets">${POMO_PRESETS.map(([w, s, l]) => `<button type="button" class="pset-chip ${set.work === w && set.short === s && set.long === l ? "on" : ""}" data-preset="${w},${s},${l}">${w}/${s}</button>`).join("")}</div>
+    ${num("work", "Фокус", 180, "мин")}${num("short", "Перерыв", 60, "мин")}${num("long", "Длинный перерыв", 120, "мин")}
+    ${num("longEvery", "Длинный после", 12, "фокусов")}
+    <label class="pset-row pset-check"><input type="checkbox" data-pset="autoBreak" ${set.autoBreak ? "checked" : ""}><span>Перерыв запускается сам</span></label>
+    <div class="pset-err" data-pset-err></div>
+    <div class="pset-actions"><button type="button" class="pset-cancel" data-pset-cancel>Отмена</button><button type="button" class="pset-save" data-pset-save>Сохранить</button></div>
+  </div>`;
+}
+
+// readPomoSettings собирает значения из формы
+function readPomoSettings(root) {
+  const v = k => root.querySelector(`[data-pset="${k}"]`);
+  return { work: +v("work").value, short: +v("short").value, long: +v("long").value, longEvery: +v("longEvery").value, autoBreak: v("autoBreak").checked };
+}
+
+// bindPomoSettings вешает обработчики на форму: пресеты, сохранение, отмена
+function bindPomoSettings(root, client, close) {
+  root.addEventListener("click", async e => {
+    const preset = e.target.closest("[data-preset]");
+    if (preset) {
+      const [w, s, l] = preset.dataset.preset.split(",");
+      root.querySelector(`[data-pset="work"]`).value = w;
+      root.querySelector(`[data-pset="short"]`).value = s;
+      root.querySelector(`[data-pset="long"]`).value = l;
+      root.querySelectorAll("[data-preset]").forEach(b => b.classList.toggle("on", b === preset));
+      return;
+    }
+    if (e.target.closest("[data-pset-cancel]")) { close(); return; }
+    if (e.target.closest("[data-pset-save]")) {
+      try { await client.saveSettings(readPomoSettings(root)); close(); }
+      catch (err) { root.querySelector("[data-pset-err]").textContent = err.message; }
+    }
+  });
+  root.addEventListener("keydown", e => {
+    if (e.key === "Enter") root.querySelector("[data-pset-save]").click();
+    if (e.key === "Escape") { e.stopPropagation(); close(); }
+  });
+}
+
+// editClock превращает цифры таймера в поле ввода; Enter сохраняет, Esc отменяет
+function editClock(el, client) {
+  if (el.querySelector("input")) return;
+  const old = el.textContent;
+  el.innerHTML = `<input class="clock-input" value="${old}" title="Минуты или мм:сс, Enter — сохранить">`;
+  const inp = el.querySelector("input");
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = async save => {
+    if (done) return;
+    done = true;
+    const m = parseClock(inp.value);
+    el.textContent = old;
+    if (save && m > 0) await client.set(m);
+  };
+  inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") finish(true);
+    if (e.key === "Escape") { e.stopPropagation(); finish(false); }
+  });
+  inp.addEventListener("blur", () => finish(true));
+}
