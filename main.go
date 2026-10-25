@@ -38,7 +38,7 @@ func main() {
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		// порт занят — скорее всего ежедневник уже запущен: просим его показать своё окно
-		log.Printf("порт %s занят (%v), ежедневник уже запущен", *addr, err)
+		log.Printf("порт %s занят (%v), Flask уже запущен", *addr, err)
 		if !*autostart && !askRunningToOpen(url) {
 			openBrowser(url)
 		}
@@ -67,7 +67,7 @@ func main() {
 	mux.Handle("GET /", http.FileServerFS(static))
 	registerAPI(mux, store, pomo)
 
-	log.Printf("Ежедневник запущен: %s, данные: %s", url, *dataPath)
+	log.Printf("Flask запущен: %s, данные: %s", url, *dataPath)
 	go func() { log.Fatal(http.Serve(ln, guard(logRequests(mux)))) }()
 	if *noTray {
 		if !*noOpen {

@@ -174,7 +174,7 @@ func newPopup(a *app) *popup {
 		AutoFocus: true,
 		// окно создаётся видимым — делаем его 1×1, чтобы при запуске ничего не мигало;
 		// настоящий размер выставляется при показе панели
-		WindowOptions: webview2.WindowOptions{Title: "Ежедневник", Width: 1, Height: 1},
+		WindowOptions: webview2.WindowOptions{Title: "Flask", Width: 1, Height: 1},
 	})
 	if wv == nil {
 		log.Println("WebView2 недоступен — по клику на иконку будет открываться браузер")
@@ -352,7 +352,7 @@ func (a *app) showMain(view string) {
 		wv := webview2.NewWithOptions(webview2.WebViewOptions{
 			DataPath:      webviewDataDir(),
 			AutoFocus:     true,
-			WindowOptions: webview2.WindowOptions{Title: "Ежедневник", Width: uint(1280 * scale), Height: uint(840 * scale), Center: true},
+			WindowOptions: webview2.WindowOptions{Title: "Flask", Width: uint(1280 * scale), Height: uint(840 * scale), Center: true},
 		})
 		if wv == nil {
 			openBrowser(a.url + "/#" + view)
@@ -418,15 +418,15 @@ func setWindowIcon(hwnd uintptr) {
 
 func (a *app) onTrayReady() {
 	systray.SetIcon(iconICO)
-	systray.SetTitle("Ежедневник")
-	systray.SetTooltip("Ежедневник")
+	systray.SetTitle("Flask")
+	systray.SetTooltip("Flask")
 	if a.pop != nil {
 		systray.SetOnTapped(func() { a.pop.wv.Dispatch(a.pop.toggle) })
 	} else {
 		systray.SetOnTapped(func() { openBrowser(a.url) })
 	}
 
-	mOpen := systray.AddMenuItem("Открыть ежедневник", "Окно программы")
+	mOpen := systray.AddMenuItem("Открыть Flask", "Окно программы")
 	mBrowser := systray.AddMenuItem("Открыть в браузере", "")
 	mAuto := systray.AddMenuItemCheckbox("Запускать вместе с Windows", "", autostartEnabled())
 	systray.AddSeparator()
@@ -474,7 +474,7 @@ func trayTooltip(s *Store, pomo *Pomodoro) string {
 	if st := pomo.State(); st.Running {
 		left := max(0, int((st.EndAt-time.Now().UnixMilli()+999)/1000))
 		name := map[string]string{"work": "🍅 Фокус", "short": "☕ Перерыв", "long": "🌿 Длинный перерыв"}[st.Mode]
-		return fmt.Sprintf("%s %02d:%02d · Ежедневник", name, left/60, left%60)
+		return fmt.Sprintf("%s %02d:%02d · Flask", name, left/60, left%60)
 	}
 	today := today()
 	left, late := 0, 0
@@ -487,7 +487,7 @@ func trayTooltip(s *Store, pomo *Pomodoro) string {
 			late++
 		}
 	}
-	tip := fmt.Sprintf("Ежедневник — на сегодня: %d", left)
+	tip := fmt.Sprintf("Flask — на сегодня: %d", left)
 	if late > 0 {
 		tip += fmt.Sprintf(", просрочено: %d", late)
 	}

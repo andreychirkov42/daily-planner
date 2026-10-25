@@ -1,4 +1,4 @@
-﻿# Сборка Ежедневник.exe: сначала все проверки, потом exe.
+﻿# Сборка Flask.exe: сначала все проверки, потом exe.
 # Если что-то не прошло, exe не собирается и старая версия остаётся как была.
 #   .\build.ps1             проверки + сборка; запущенная программа перезапускается
 #   .\build.ps1 -SkipTests  только сборка (не рекомендуется)
@@ -6,7 +6,7 @@ param([switch]$SkipTests)
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-$exe = Join-Path $PSScriptRoot "Ежедневник.exe"
+$exe = Join-Path $PSScriptRoot "Flask.exe"
 
 function Step([string]$name, [scriptblock]$action) {
     Write-Host "==> $name" -ForegroundColor Cyan
@@ -38,7 +38,7 @@ if (-not $SkipTests) {
 # запущенный exe заблокирован Windows — останавливаем его и запускаем снова после сборки
 $running = Get-Process | Where-Object { $_.Path -eq $exe }
 if ($running) {
-    Write-Host "==> Останавливаю запущенный ежедневник" -ForegroundColor Cyan
+    Write-Host "==> Останавливаю запущенный Flask" -ForegroundColor Cyan
     $running | Stop-Process -Force
     Start-Sleep -Milliseconds 800
 }
@@ -47,6 +47,6 @@ Step "Сборка exe" { go build -ldflags "-H windowsgui -s -w" -o $exe . }
 
 if ($running) {
     Start-Process -FilePath $exe -ArgumentList "-autostart" -WorkingDirectory $PSScriptRoot
-    Write-Host "==> Ежедневник снова запущен в трее" -ForegroundColor Cyan
+    Write-Host "==> Flask снова запущен в трее" -ForegroundColor Cyan
 }
 Write-Host "✓ Готово: $exe" -ForegroundColor Green

@@ -1,6 +1,6 @@
 // genicon рисует иконку приложения: assets/icon.ico (трей и exe), assets/icon.png, web/icon.png.
 //
-//	go run ./tools/genicon                 иконка по умолчанию (монограмма «Е»)
+//	go run ./tools/genicon                 иконка по умолчанию (часы одной линией на тёмно-фиолетовом)
 //	go run ./tools/genicon -variant=page   другой вариант
 //	go run ./tools/genicon -preview=file   лист со всеми вариантами для сравнения
 package main
@@ -25,22 +25,28 @@ type pt struct{ x, y float64 }
 
 // variants — варианты иконки; у каждого своя функция цвета пикселя в координатах 0..1
 var variants = map[string]func(x, y, px float64) color.NRGBA{
-	"monogram":  monogram,  // буква «Е» из строк списка и тёплая точка «сегодня»
-	"stripes":   stripes,   // ретро-солнце с вырезанными полосами
-	"hourglass": hourglass, // гранёные песочные часы с тёплым песком
-	"gem":       gem,       // огранённый камень с искрой
-	"star":      star,      // гранёная четырёхлучевая звезда-ориентир
-	"bookmark":  bookmark,  // лента-закладка ежедневника
-	"sunrise":   sunrise,   // солнце над горизонтом — план на день
-	"layers":    layers,    // стопка карточек-задач
-	"crystal":   crystal,   // гранёная галочка (прежний вариант)
-	"page":      page,
-	"glow":      glow,
+	"line-violet":      lineHourglass(rgb(0x7c5cff), 0.066), // часы одной линией на фиолетовом
+	"line-deep":        lineHourglass(rgb(0x5b3fd6), 0.066),
+	"line-lilac":       lineHourglass(rgb(0x9a7bff), 0.066),
+	"line-violet-bold": lineHourglass(rgb(0x7c5cff), 0.075),
+	"hourglass-white":  flatHourglass(flatLight), // плоские песочные часы: белое стекло, оранжевый песок
+	"hourglass-blue":   flatHourglass(flatBlue),  // плоские песочные часы: синее стекло
+	"monogram":         monogram,                 // буква «Е» из строк списка и тёплая точка «сегодня»
+	"stripes":          stripes,                  // ретро-солнце с вырезанными полосами
+	"hourglass":        hourglass,                // гранёные песочные часы с тёплым песком
+	"gem":              gem,                      // огранённый камень с искрой
+	"star":             star,                     // гранёная четырёхлучевая звезда-ориентир
+	"bookmark":         bookmark,                 // лента-закладка ежедневника
+	"sunrise":          sunrise,                  // солнце над горизонтом — план на день
+	"layers":           layers,                   // стопка карточек-задач
+	"crystal":          crystal,                  // гранёная галочка (прежний вариант)
+	"page":             page,
+	"glow":             glow,
 }
-var order = []string{"monogram", "stripes", "hourglass", "gem", "sunrise"}
+var order = []string{"line-violet", "line-deep", "line-lilac"}
 
 func main() {
-	variant := flag.String("variant", "monogram", "вариант: monogram, stripes, hourglass, gem, star, bookmark, sunrise, layers, crystal, page, glow")
+	variant := flag.String("variant", "line-deep", "вариант: line-deep, line-violet, line-lilac, hourglass-white, hourglass-blue, monogram, stripes, hourglass, gem, star, bookmark, sunrise, layers, crystal, page, glow")
 	preview := flag.String("preview", "", "сохранить лист сравнения вариантов в этот PNG")
 	flag.Parse()
 
@@ -590,6 +596,126 @@ func gem(x, y, px float64) color.NRGBA {
 		return lerp(rgb(0xfff2c0), warmTop, (dx+dy)/0.1)
 	}
 	return c
+}
+
+// ---------- плоские песочные часы: три сплошных цвета, без градиентов ----------
+
+var (
+	flatTile  = rgb(0x131b2e)
+	flatLight = rgb(0xeef2fa)
+	flatBlue  = rgb(0x4f86ff)
+	flatSand  = rgb(0xff8a3d)
+)
+
+func flatHourglass(glass color.NRGBA) func(x, y, px float64) color.NRGBA {
+	// inBulb — выпуклая колба: у рамки чуть уже, посередине раздувается, к горлышку сходится
+	const y0, neck, y1, wmax, wneck = 0.27, 0.5, 0.73, 0.2, 0.022
+	inBulb := func(x, y float64) bool {
+		var t float64
+		switch {
+		case y >= y0 && y <= neck:
+			t = (y - y0) / (neck - y0)
+		case y > neck && y <= y1:
+			t = (y1 - y) / (y1 - neck)
+		default:
+			return false
+		}
+		w := wneck + (wmax-wneck)*math.Sin(math.Pi*(0.2+0.8*t))
+		return math.Abs(x-0.5) <= w
+	}
+	return func(x, y, px float64) color.NRGBA {
+		if !inRoundRect(x, y, 0.02, 0.02, 0.98, 0.98, 0.225) {
+			return transparent
+		}
+		for _, by := range []float64{0.235, 0.765} {
+			if inCapsule(x, y, pt{0.3, by}, pt{0.7, by}, 0.048) {
+				return flatLight
+			}
+		}
+		if !inBulb(x, y) {
+			return flatTile
+		}
+		// песок: горка в нижней колбе и остаток у горлышка наверху
+		if y > 0.63 || (y > 0.43 && y < neck) {
+			return flatSand
+		}
+		return glass
+	}
+}
+
+// ---------- песочные часы одной линией с перехлёстом (по эскизу) ----------
+
+// path — ломаная, в которую раскладываются отрезки, дуги и кривые Безье
+type path struct{ pts []pt }
+
+func (p *path) to(q pt) { p.pts = append(p.pts, q) }
+
+func (p *path) cubic(c1, c2, end pt) {
+	s := p.pts[len(p.pts)-1]
+	for i := 1; i <= 32; i++ {
+		t := float64(i) / 32
+		u := 1 - t
+		p.to(pt{
+			u*u*u*s.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*end.x,
+			u*u*u*s.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*end.y,
+		})
+	}
+}
+
+// arc — дуга окружности от угла a0 до a1 (градусы, ось y вниз)
+func (p *path) arc(c pt, r, a0, a1 float64) {
+	for i := 1; i <= 16; i++ {
+		a := (a0 + (a1-a0)*float64(i)/16) * math.Pi / 180
+		p.to(pt{c.x + r*math.Cos(a), c.y + r*math.Sin(a)})
+	}
+}
+
+// hourglassLine строит контур в координатах эскиза: рамка 78..197 × 57..258,
+// одна линия от разрыва вокруг всей фигуры обратно к разрыву.
+func hourglassLine() []pt {
+	const L, R, T, B, r = 78.0, 197.0, 57.0, 258.0, 18.0
+	p := &path{}
+	p.to(pt{116, 178}) // нижний конец разрыва
+	p.to(pt{105, 190})
+	p.cubic(pt{93, 202}, pt{L, 220}, pt{L, B - r})
+	p.arc(pt{L + r, B - r}, r, 180, 90)
+	p.to(pt{R - r, B})
+	p.arc(pt{R - r, B - r}, r, 90, 0)
+	p.cubic(pt{R, 220}, pt{187, 207}, pt{175, 195})
+	p.to(pt{100, 120}) // диагональ, проходящая «сверху» через центр
+	p.cubic(pt{88, 108}, pt{L, 95}, pt{L, T + r})
+	p.arc(pt{L + r, T + r}, r, 180, 270)
+	p.to(pt{R - r, T})
+	p.arc(pt{R - r, T + r}, r, 270, 360)
+	p.cubic(pt{R, 95}, pt{182, 113}, pt{170, 125})
+	p.to(pt{156, 140}) // верхний конец разрыва
+	// в координаты иконки: высота фигуры 0.6, центр в середине плитки
+	k := 0.6 / (B - T)
+	out := make([]pt, len(p.pts))
+	for i, q := range p.pts {
+		out[i] = pt{0.5 + (q.x-137.5)*k, 0.5 + (q.y-157.5)*k}
+	}
+	return out
+}
+
+var hourglassPts = hourglassLine()
+
+func lineHourglass(bg color.NRGBA, width float64) func(x, y, px float64) color.NRGBA {
+	half := width / 2
+	return func(x, y, px float64) color.NRGBA {
+		if !inRoundRect(x, y, 0.02, 0.02, 0.98, 0.98, 0.225) {
+			return transparent
+		}
+		if x < 0.29 || x > 0.71 || y < 0.17 || y > 0.83 {
+			return bg
+		}
+		for i := 1; i < len(hourglassPts); i++ {
+			if segDist(x, y, hourglassPts[i-1], hourglassPts[i]) <= half {
+				return rgb(0xffffff)
+			}
+		}
+		return bg
+	}
 }
 
 // downsample усредняет блоки ss×ss с учётом прозрачности.
