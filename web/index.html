@@ -9,6 +9,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lora:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // ошибки JS записываются в атрибут — их проверяет автотест перед сборкой
+    (() => {
+      const errs = [];
+      const put = msg => { if (errs.includes(msg) || errs.length > 8) return; errs.push(msg); document.documentElement.dataset.errors = errs.join(" | "); };
+      addEventListener("error", e => put(e.message + " @ " + (e.filename || "").split("/").pop() + ":" + e.lineno));
+      addEventListener("unhandledrejection", e => put("promise: " + (e.reason && e.reason.message || e.reason)));
+    })();
+  </script>
 </head>
 <body>
 <div class="app">
@@ -131,6 +140,15 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="shared.js"></script>
-<script src="app.js"></script>
+<script src="js/core.js"></script>
+<script src="js/quickadd.js"></script>
+<script src="js/render.js"></script>
+<script src="js/views.js"></script>
+<script src="js/plan.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/pomodoro.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

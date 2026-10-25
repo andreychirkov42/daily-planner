@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ежедневник</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+  // ошибки JS записываются в атрибут — их проверяет автотест перед сборкой
+  (() => {
+    const errs = [];
+    const put = msg => { if (errs.includes(msg) || errs.length > 8) return; errs.push(msg); document.documentElement.dataset.errors = errs.join(" | "); };
+    addEventListener("error", e => put(e.message + " @ " + (e.filename || "").split("/").pop() + ":" + e.lineno));
+    addEventListener("unhandledrejection", e => put("promise: " + (e.reason && e.reason.message || e.reason)));
+  })();
+</script>
 <style>
   :root {
     --bg: #121822; --card: #19212e; --card-2: #202a3a; --line: #283346;
@@ -400,7 +409,14 @@ bindPomoSettings($("#pomoSettings"), pomo, () => { $("#pomoSettings").hidden = t
 
 // вызывается из Go при каждом показе окна
 window.onPopupShow = () => { load(); pomo.refresh(); };
-load();
+load().then(async () => {
+  if (location.search.includes("smoke")) {
+    for (const tab of ["late", "tomorrow", "today"]) { P.tab = tab; render(); }
+    toggleSettings(); toggleSettings();
+    await new Promise(r => setTimeout(r, 1200)); // таймер успевает отрисоваться
+  }
+  document.documentElement.dataset.ready = "1";
+});
 </script>
 </body>
 </html>

@@ -522,3 +522,17 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .clock-arrows button { width: 24px; height: 18px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; font-size: 9px; color: var(--ink-3); display: grid; place-items: center; padding: 0; user-select: none; touch-action: none; }
 .clock-arrows button:hover { color: var(--accent); border-color: var(--accent); }
 .clock-arrows button:active { background: var(--accent-soft); }
+
+/* ---------- «Дополнительно» в панели задачи ---------- */
+.more { border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--panel-2) 45%, transparent); }
+.more > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; font-size: 12px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em;
+}
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::before { content: "›"; font-size: 16px; line-height: 1; transition: transform .2s; color: var(--ink-3); }
+.more[open] > summary::before { transform: rotate(90deg); }
+.more > summary:hover { color: var(--ink-2); }
+.more-sum { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.more[open] .more-sum { display: none; }
+.more-body { display: flex; flex-direction: column; gap: 14px; padding: 2px 12px 14px; }
