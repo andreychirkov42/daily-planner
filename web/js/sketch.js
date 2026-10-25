@@ -12,7 +12,7 @@ const sketch = (() => {
   let color = safeGet("sk:color") || COLORS[0];
   let size = +(safeGet("sk:size") || 4);
   let strokes = [], redo = [], base = null, current = null, list = [];
-  let drawing = null, saveTimer = null, dirty = false;
+  let drawing = null, saveTimer = null, dirty = false, opened = false;
 
   function build() {
     root = document.createElement("div");
@@ -131,7 +131,7 @@ const sketch = (() => {
     ctx.globalAlpha = 1;
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
-    if (base) ctx.drawImage(base, 0, 0, W, H);
+    if (base && base.naturalWidth) ctx.drawImage(base, 0, 0, W, H);
     for (const s of strokes) drawStroke(ctx, s);
   }
 
@@ -189,10 +189,10 @@ const sketch = (() => {
     await save();
     const img = new Image();
     img.src = `/api/sketches/${id}/image?v=${Date.now()}`;
-    await img.decode().catch(() => {});
-    current = id; base = img; strokes = []; redo = [];
+    const ok = await img.decode().then(() => true, () => false);
+    current = id; base = ok ? img : null; strokes = []; redo = [];
     root.querySelector("#skTitle").value = (list.find(x => x.id === id) || {}).title || "";
-    paint(); status(""); syncBar(); renderGallery();
+    paint(); status(ok ? "" : "файл рисунка не найден"); syncBar(); renderGallery();
   }
 
   async function remove(id) {
@@ -205,6 +205,11 @@ const sketch = (() => {
 
   async function loadList() {
     try { list = (await api("GET", "/sketches")) || []; } catch { list = []; }
+    // при первом открытии холста показываем последний рисунок, а не пустой лист
+    if (!opened) {
+      opened = true;
+      if (list.length && !current && !strokes.length) return open(list[0].id);
+    }
     renderGallery();
   }
 

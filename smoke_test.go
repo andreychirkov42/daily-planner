@@ -112,4 +112,8 @@ func seedSmokeData(t *testing.T, s *Store) {
 	h, _ := s.CreateHabit(&Habit{Name: "Чтение", Color: "#2f6bff"})
 	_, _ = s.ToggleHabit(h.ID, d(0))
 	_ = s.SetNote(d(0), "заметка дня")
+	// запись о рисунке без PNG-файла: холст должен открыться, а не упасть
+	s.mu.Lock()
+	s.data.Sketches = append(s.data.Sketches, &Sketch{ID: "00000000deadbeef", Title: "Потерянный", CreatedAt: day, UpdatedAt: day})
+	s.mu.Unlock()
 }

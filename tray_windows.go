@@ -147,6 +147,10 @@ func runApp(o appOptions) {
 }
 
 func webviewDataDir() string {
+	// для тестов: отдельная папка, чтобы не мешать запущенной копии
+	if dir := os.Getenv("DAILYPLANNER_WEBVIEW_DIR"); dir != "" {
+		return dir
+	}
 	return filepath.Join(os.Getenv("LOCALAPPDATA"), "DailyPlanner", "webview")
 }
 
@@ -173,7 +177,9 @@ func newPopup(a *app) *popup {
 	}
 
 	_ = wv.Bind("hidePopup", func() { p.hide() })
-	_ = wv.Bind("openMain", func(view string) { a.showMain(view) })
+	// Окно создаём не прямо в обработчике нажатия: WebView2 не умеет создавать новое окно
+	// изнутри события другого — откладываем в очередь главного потока.
+	_ = wv.Bind("openMain", func(view string) { wv.Dispatch(func() { a.showMain(view) }) })
 	_ = wv.Bind("openInBrowser", func(view string) {
 		p.hide()
 		openBrowser(a.url + "/#" + view)
