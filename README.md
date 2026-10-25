@@ -3,10 +3,10 @@
 Личный планировщик задач: основное окно в браузере и мини-панель в трее Windows. Бэкенд на Go, фронтенд на чистом HTML/CSS/JS, всё встроено в один `Clepsy.exe`. Данные хранятся в `data.json` рядом с exe.
 
 <p align="center">
-  <img src="docs/today-dark.jpg" width="62%" alt="Раздел «Сегодня», тёмная тема">
-  <img src="docs/tray-popup.jpg" width="25%" alt="Мини-панель в трее">
+  <img src="docs/today-dark.png" width="62%" alt="Раздел «Сегодня», тёмная тема">
+  <img src="docs/tray-popup.png" width="27%" alt="Мини-панель в трее">
 </p>
-<p align="center"><img src="docs/board-light.jpg" width="62%" alt="Канбан-доска, светлая тема"></p>
+<p align="center"><img src="docs/board-light.png" width="62%" alt="Канбан-доска, светлая тема"></p>
 
 ## Скачать
 
