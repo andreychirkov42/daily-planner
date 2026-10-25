@@ -516,3 +516,9 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .pset-actions .pset-save { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; }
 .pomo-modes button { line-height: 1.15; padding: 3px 0; }
 .pomo-modes button small { display: block; font-size: 9.5px; font-weight: 600; opacity: .75; }
+.pomo-clock { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
+.pomo-clock .pomo-time { margin-top: 0; padding: 0 4px; }
+.clock-arrows { display: flex; flex-direction: column; gap: 3px; }
+.clock-arrows button { width: 24px; height: 18px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; font-size: 9px; color: var(--ink-3); display: grid; place-items: center; padding: 0; user-select: none; touch-action: none; }
+.clock-arrows button:hover { color: var(--accent); border-color: var(--accent); }
+.clock-arrows button:active { background: var(--accent-soft); }

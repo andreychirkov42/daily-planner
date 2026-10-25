@@ -60,6 +60,10 @@
   .pomo-time { cursor: text; border-radius: 8px; padding: 0 4px; margin-left: -4px; transition: background .15s; }
   .pomo-time:hover { background: var(--card-2); }
   .clock-input { width: 130px; font: inherit; color: var(--pm); background: var(--bg); border: 1px solid var(--pm); border-radius: 8px; padding: 0 6px; outline: 0; }
+  .clock-arrows { display: flex; flex-direction: column; gap: 2px; }
+  .clock-arrows button { width: 24px; height: 17px; border: 1px solid var(--line); background: var(--card-2); border-radius: 5px; font-size: 9px; color: var(--ink-3); display: grid; place-items: center; padding: 0; user-select: none; touch-action: none; }
+  .clock-arrows button:hover { color: var(--pm); border-color: var(--pm); }
+  .clock-arrows button:active { background: color-mix(in srgb, var(--pm) 25%, var(--card-2)); }
   .pgear { border: 0; background: none; color: var(--ink-3); font-size: 15px; padding: 2px 4px; border-radius: 6px; }
   .pgear:hover, .pgear.on { color: var(--ink); background: var(--card-2); }
   .pset { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
@@ -151,7 +155,8 @@
       <button class="pgear" id="pomoGear" title="Настроить время">⚙</button>
     </div>
     <div class="pomo-main">
-      <div class="pomo-time" id="pomoTime" title="Нажми, чтобы ввести своё время">25:00</div>
+      <div class="pomo-time" id="pomoTime" title="Нажми, чтобы ввести своё время, или крути колёсико">25:00</div>
+      <div class="clock-arrows"><button type="button" data-adj="1" title="+1 минута">▲</button><button type="button" data-adj="-1" title="−1 минута">▼</button></div>
       <div class="pomo-ctrl">
         <button class="pbtn" id="pomoReset" title="Сначала">↺</button>
         <button class="pbtn" id="pomoSkip" title="Пропустить">⏭</button>
@@ -380,6 +385,7 @@ const pomo = pomoClient(st => {
 });
 
 $("#pomoTime").addEventListener("click", () => editClock($("#pomoTime"), pomo));
+bindClockArrows($("#pomo"), $("#pomoTime"), pomo);
 
 function toggleSettings() {
   const box = $("#pomoSettings");

@@ -131,6 +131,14 @@ func TestPomodoroCustomSettings(t *testing.T) {
 	if st, _ := p.Do("set", "", "", 12.5); st.Left != 750 {
 		t.Fatalf("set 12.5 мин: осталось %d с", st.Left)
 	}
+	// стрелки: +1 и −1 минута, но не меньше минуты
+	if st, _ := p.Do("add", "", "", 1); st.Left != 810 {
+		t.Fatalf("+1 мин: осталось %d с, ожидали 810", st.Left)
+	}
+	p.Do("set", "", "", 1.5)
+	if st, _ := p.Do("add", "", "", -1); st.Left != 60 {
+		t.Fatalf("−1 мин от 1:30: осталось %d с, ожидали минимум 60", st.Left)
+	}
 	// после двух фокусов — длинный перерыв, и без автозапуска
 	p.Do("start", "", "", 0)
 	p.finish(true)

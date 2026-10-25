@@ -120,6 +120,17 @@ func (p *Pomodoro) Do(action, mode, label string, minutes float64) (PomoState, e
 		if p.st.Running {
 			p.st.EndAt = now.Add(time.Duration(left) * time.Second).UnixMilli()
 		}
+	case "add":
+		// стрелки у часов: ±минуты к оставшемуся времени, не меньше минуты
+		cur := p.st.Left
+		if p.st.Running {
+			cur = p.leftLocked(now)
+		}
+		left := min(max(cur+int(minutes*60), 60), 600*60)
+		p.st.Left = left
+		if p.st.Running {
+			p.st.EndAt = now.Add(time.Duration(left) * time.Second).UnixMilli()
+		}
 	case "skip":
 		p.mu.Unlock()
 		p.finish(false)

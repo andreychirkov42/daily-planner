@@ -112,6 +112,7 @@ function pomoClient(onChange, onFinish) {
     skip: () => call({ action: "skip" }),
     mode: (mode, label) => call({ action: "mode", mode, label: label || "" }),
     set: minutes => call({ action: "set", minutes }),
+    add: minutes => call({ action: "add", minutes }),
     async saveSettings(set) {
       const r = await fetch("/api/pomodoro/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(set) });
       const body = await r.json();
@@ -200,4 +201,24 @@ function editClock(el, client) {
     if (e.key === "Escape") { e.stopPropagation(); finish(false); }
   });
   inp.addEventListener("blur", () => finish(true));
+}
+
+// bindClockArrows: стрелки ▲▼ у часов (±1 минута, зажатие повторяет) и колёсико мыши над часами
+function bindClockArrows(root, clockEl, client) {
+  let holdTimer = null, repeatTimer = null;
+  const stop = () => { clearTimeout(holdTimer); clearInterval(repeatTimer); holdTimer = repeatTimer = null; };
+  root.querySelectorAll("[data-adj]").forEach(btn => {
+    const step = +btn.dataset.adj;
+    btn.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      client.add(step);
+      holdTimer = setTimeout(() => { repeatTimer = setInterval(() => client.add(step), 130); }, 450);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(ev => btn.addEventListener(ev, stop));
+  });
+  clockEl.addEventListener("wheel", e => {
+    if (clockEl.querySelector("input")) return;
+    e.preventDefault();
+    client.add(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
 }

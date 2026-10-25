@@ -1155,6 +1155,7 @@ const pomo = (() => {
       $("#pomoReset").onclick = () => c.reset();
       $$(".pomo-modes button").forEach(b => (b.onclick = () => c.mode(b.dataset.mode)));
       $("#pomoTime").onclick = () => editClock($("#pomoTime"), c);
+      bindClockArrows($("#pomoClock"), $("#pomoTime"), c);
       const box = $("#pomoSettings");
       const close = () => { box.hidden = true; $("#pomoGear").classList.remove("on"); };
       $("#pomoGear").onclick = () => {
