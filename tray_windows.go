@@ -66,6 +66,7 @@ const (
 	dwmRound        = 2
 	autostartKey    = `Software\Microsoft\Windows\CurrentVersion\Run`
 	autostartName   = "DailyPlanner"
+	approvedKey     = `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`
 )
 
 type point struct{ X, Y int32 }
@@ -92,6 +93,7 @@ func runApp(url string, s *Store, showPopup bool) {
 		pSetProcessDpiAwarenessContext.Call(^uintptr(3)) // PER_MONITOR_AWARE_V2 (-4)
 	}
 
+	repairAutostart()
 	p := newPopup(url)
 	systray.Register(func() { onTrayReady(url, s, p) }, func() {
 		if p != nil {
@@ -294,14 +296,23 @@ func trayTooltip(s *Store) string {
 	return tip
 }
 
+// autostartEnabled учитывает и запись в Run, и флаг из «Автозагрузки» диспетчера задач.
 func autostartEnabled() bool {
 	k, err := registry.OpenKey(registry.CURRENT_USER, autostartKey, registry.QUERY_VALUE)
 	if err != nil {
 		return false
 	}
 	defer k.Close()
-	_, _, err = k.GetStringValue(autostartName)
-	return err == nil
+	if _, _, err = k.GetStringValue(autostartName); err != nil {
+		return false
+	}
+	a, err := registry.OpenKey(registry.CURRENT_USER, approvedKey, registry.QUERY_VALUE)
+	if err != nil {
+		return true
+	}
+	defer a.Close()
+	flag, _, err := a.GetBinaryValue(autostartName)
+	return err != nil || len(flag) == 0 || flag[0]&1 == 0 // нечётный первый байт — «отключено»
 }
 
 func setAutostart(on bool) error {
@@ -311,13 +322,42 @@ func setAutostart(on bool) error {
 	}
 	defer k.Close()
 	if !on {
-		return k.DeleteValue(autostartName)
+		_ = setApproved(nil)
+		if err := k.DeleteValue(autostartName); err != nil && err != registry.ErrNotExist {
+			return err
+		}
+		return nil
 	}
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	return k.SetStringValue(autostartName, `"`+exe+`" -autostart`)
+	if err := k.SetStringValue(autostartName, `"`+exe+`" -autostart`); err != nil {
+		return err
+	}
+	// Без явного «включено» в StartupApproved Windows 11 может пропустить новую запись в Run.
+	return setApproved([]byte{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+}
+
+// setApproved пишет флаг автозагрузки (nil — удалить запись).
+func setApproved(flag []byte) error {
+	a, _, err := registry.CreateKey(registry.CURRENT_USER, approvedKey, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+	if flag == nil {
+		return a.DeleteValue(autostartName)
+	}
+	return a.SetBinaryValue(autostartName, flag)
+}
+
+// repairAutostart чинит запись, если exe перенесли в другую папку или флаг одобрения потерялся.
+func repairAutostart() {
+	if !autostartEnabled() {
+		return
+	}
+	_ = setAutostart(true)
 }
 
 // runMessageLoop нужен, только если WebView2 не запустился.

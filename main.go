@@ -38,8 +38,10 @@ func main() {
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		// порт занят — скорее всего ежедневник уже запущен, просто открываем его
-		log.Printf("порт %s занят (%v), открываю уже запущенный ежедневник", *addr, err)
-		openBrowser(url)
+		log.Printf("порт %s занят (%v), ежедневник уже запущен", *addr, err)
+		if !*autostart {
+			openBrowser(url)
+		}
 		return
 	}
 
