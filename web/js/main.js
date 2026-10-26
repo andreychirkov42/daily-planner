@@ -60,7 +60,7 @@ function init() {
 
   $("#burger").onclick = () => $("#sidebar").classList.toggle("open");
   $("#helpModal").addEventListener("click", e => { if (e.target.id === "helpModal" || e.target.dataset.close !== undefined) $("#helpModal").hidden = true; });
-  loadSettings(); // настройки программы (конец дня, крестик, автозапуск)
+  loadSettings().then(initAutoSync); // настройки программы (конец дня, крестик, автозапуск), потом синхронизация телефона
 
   document.addEventListener("keydown", e => {
     const typing = e.target.matches("input, textarea, select");

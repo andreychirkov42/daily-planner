@@ -32,6 +32,7 @@ func main() {
 	noTray := flag.Bool("no-tray", false, "без иконки в трее, только веб-сервер")
 	autostart := flag.Bool("autostart", false, "запуск вместе с Windows: тихо, только иконка в трее")
 	showPopup := flag.Bool("popup", false, "сразу показать мини-панель из трея")
+	syncAddr := flag.String("sync-addr", ":"+syncPort, "адрес приёма синхронизации с телефона (включается в настройках)")
 	flag.Parse()
 	setupLog(filepath.Join(filepath.Dir(*dataPath), "planner.log"))
 
@@ -51,6 +52,8 @@ func main() {
 		log.Fatalf("не удалось открыть %s: %v", *dataPath, err)
 	}
 	pomo := NewPomodoro(store)
+	syncSrv = &syncServer{store: store, addr: *syncAddr}
+	syncSrv.apply() // если в настройках включена синхронизация с телефоном
 	// раз в минуту переносим невыполненное (и сразу после полуночи, и при старте)
 	go func() {
 		for {
@@ -137,8 +140,12 @@ func setupLog(path string) {
 	log.SetOutput(io.MultiWriter(f, os.Stderr))
 }
 
+// syncSrv принимает синхронизацию с телефона; nil в тестах.
+var syncSrv *syncServer
+
 func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 	registerSketchAPI(mux, s)
+	registerSyncAPI(mux, s, syncSrv)
 	mux.HandleFunc("GET /api/pomodoro", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, pomo.State())
 	})
@@ -402,6 +409,7 @@ func settingsView(s *Store) map[string]any {
 		"dataPath":    s.path,
 		"canReveal":   revealFile != nil,
 		"desktop":     putAutostart != nil, // есть ли оболочка Windows с треем
+		"phone":       apiToken != "",      // запущен внутри приложения Android
 	}
 	if getAutostart != nil {
 		v["autostart"] = getAutostart()

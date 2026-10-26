@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -45,6 +46,8 @@ type Task struct {
 	// Что делать, если задача не выполнена к сроку
 	Carry  string `json:"carry"`  // "" — остаётся просроченной, "move" — переезжает на сегодня, "shift" — сдвигается весь план
 	Series string `json:"series"` // план, к которому относится задача (для "shift")
+
+	UpdatedAt time.Time `json:"updatedAt"` // последняя правка — по ней синхронизация выбирает версию
 }
 
 // Series — план из последовательных задач (например, курс), разложенных по дням недели.
@@ -53,6 +56,8 @@ type Series struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	PerDay [7]int `json:"perDay"` // сколько задач в день: вс, пн, вт, ср, чт, пт, сб
+
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // stopTimer прибавляет время идущего таймера к Spent.
@@ -68,6 +73,8 @@ type List struct {
 	Name  string `json:"name"`
 	Color string `json:"color"`
 	Icon  string `json:"icon"`
+
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type Habit struct {
@@ -75,6 +82,8 @@ type Habit struct {
 	Name  string          `json:"name"`
 	Color string          `json:"color"`
 	Done  map[string]bool `json:"done"` // дата -> отмечено
+
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type Data struct {
@@ -87,6 +96,11 @@ type Data struct {
 	Pomo     *PomoSettings     `json:"pomoSettings,omitempty"`
 	Sketches []*Sketch         `json:"sketches"`
 	App      *AppSettings      `json:"app,omitempty"`
+
+	// для синхронизации (sync.go): когда правили заметки дня и что удалено (id → когда)
+	NoteTimes map[string]time.Time `json:"noteTimes,omitempty"`
+	Deleted   map[string]time.Time `json:"deleted,omitempty"`
+	Sync      *SyncSettings        `json:"sync,omitempty"`
 }
 
 type Store struct {
@@ -131,6 +145,12 @@ func (s *Store) normalize() {
 	if s.data.Pomos == nil {
 		s.data.Pomos = map[string]int{}
 	}
+	if s.data.NoteTimes == nil {
+		s.data.NoteTimes = map[string]time.Time{}
+	}
+	if s.data.Deleted == nil {
+		s.data.Deleted = map[string]time.Time{}
+	}
 	for _, h := range s.data.Habits {
 		if h.Done == nil {
 			h.Done = map[string]bool{}
@@ -164,6 +184,16 @@ func newID() string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// repeatID — id следующего повтора задачи. Он одинаковый на всех устройствах, поэтому
+// отметка одной и той же задачи на телефоне и на ПК не даёт после синхронизации двух копий.
+func repeatID(id, due string) string {
+	h := sha256.Sum256([]byte(id + "/" + due))
+	return hex.EncodeToString(h[:8])
+}
+
+// tombLocked запоминает удаление, чтобы синхронизация удалила запись и на другом устройстве.
+func (s *Store) tombLocked(id string, now time.Time) { s.data.Deleted[id] = now }
 
 // ---- задачи ----
 
@@ -201,6 +231,7 @@ func (s *Store) CreateTask(t *Task) (*Task, error) {
 	defer s.mu.Unlock()
 	t.ID = newID()
 	t.CreatedAt = time.Now()
+	t.UpdatedAt = t.CreatedAt
 	t.Order = len(s.data.Tasks)
 	t.TimerStart = nil // таймер запускается только через свой эндпоинт
 	if t.Status == "doing" && t.Done {
@@ -260,6 +291,7 @@ func (s *Store) UpdateTask(id string, in *Task) (*Task, error) {
 		in.CompletedAt = nil
 	}
 	fixTask(in)
+	in.UpdatedAt = time.Now()
 	*t = *in
 	return t, s.saveLocked()
 }
@@ -272,6 +304,7 @@ func (s *Store) DeleteTask(id string) error {
 		return ErrNotFound
 	}
 	s.data.Tasks = append(s.data.Tasks[:i], s.data.Tasks[i+1:]...)
+	s.tombLocked(id, time.Now())
 	return s.saveLocked()
 }
 
@@ -285,29 +318,35 @@ func (s *Store) ToggleTask(id string) (*Task, *Task, error) {
 		return nil, nil, ErrNotFound
 	}
 	t.Done = !t.Done
+	t.UpdatedAt = time.Now()
 	var next *Task
 	if t.Done {
-		now := time.Now()
+		now := t.UpdatedAt
 		t.CompletedAt = &now
 		t.stopTimer(now)
 		t.Status = ""
 		if t.Repeat != "" {
 			cp := *t
-			cp.ID = newID()
+			cp.Due = nextDate(t.Due, t.Repeat)
+			cp.ID = repeatID(t.ID, cp.Due)
 			cp.Done = false
 			cp.CompletedAt = nil
 			cp.Spent = 0
 			cp.CreatedAt = now
 			cp.Order = len(s.data.Tasks)
-			cp.Due = nextDate(t.Due, t.Repeat)
 			cp.Tags = append([]string{}, t.Tags...)
 			cp.Subtasks = make([]Subtask, len(t.Subtasks))
 			for i, st := range t.Subtasks {
 				cp.Subtasks[i] = Subtask{ID: newID(), Title: st.Title}
 			}
 			t.Repeat = "" // повтор переходит к новой копии
-			s.data.Tasks = append(s.data.Tasks, &cp)
-			next = &cp
+			if _, old := s.findTask(cp.ID); old != nil {
+				*old = cp // повтор уже пришёл с другого устройства — обновляем его, а не дублируем
+				next = old
+			} else {
+				s.data.Tasks = append(s.data.Tasks, &cp)
+				next = &cp
+			}
 		}
 	} else {
 		t.CompletedAt = nil
@@ -329,6 +368,7 @@ func (s *Store) StartTimer(id string) ([]*Task, error) {
 	for _, o := range s.data.Tasks {
 		if o.TimerStart != nil && o.ID != id {
 			o.stopTimer(now)
+			o.UpdatedAt = now
 			changed = append(changed, o)
 		}
 	}
@@ -338,6 +378,7 @@ func (s *Store) StartTimer(id string) ([]*Task, error) {
 	if !t.Done {
 		t.Status = "doing"
 	}
+	t.UpdatedAt = now
 	changed = append(changed, t)
 	return changed, s.saveLocked()
 }
@@ -350,6 +391,7 @@ func (s *Store) StopTimer(id string) (*Task, error) {
 		return nil, ErrNotFound
 	}
 	t.stopTimer(time.Now())
+	t.UpdatedAt = time.Now()
 	return t, s.saveLocked()
 }
 
@@ -393,9 +435,11 @@ func (s *Store) Reorder(ids []string) error {
 	for i, id := range ids {
 		pos[id] = i
 	}
+	now := time.Now()
 	for _, t := range s.data.Tasks {
-		if p, ok := pos[t.ID]; ok {
+		if p, ok := pos[t.ID]; ok && t.Order != p {
 			t.Order = p
+			t.UpdatedAt = now
 		}
 	}
 	return s.saveLocked()
@@ -406,9 +450,11 @@ func (s *Store) ClearCompleted() (int, error) {
 	defer s.mu.Unlock()
 	kept := s.data.Tasks[:0]
 	removed := 0
+	now := time.Now()
 	for _, t := range s.data.Tasks {
 		if t.Done {
 			removed++
+			s.tombLocked(t.ID, now)
 			continue
 		}
 		kept = append(kept, t)
@@ -423,6 +469,7 @@ func (s *Store) CreateList(l *List) (*List, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	l.ID = newID()
+	l.UpdatedAt = time.Now()
 	s.data.Lists = append(s.data.Lists, l)
 	return l, s.saveLocked()
 }
@@ -433,6 +480,7 @@ func (s *Store) UpdateList(id string, in *List) (*List, error) {
 	for _, l := range s.data.Lists {
 		if l.ID == id {
 			in.ID = id
+			in.UpdatedAt = time.Now()
 			*l = *in
 			return l, s.saveLocked()
 		}
@@ -447,9 +495,12 @@ func (s *Store) DeleteList(id string) error {
 	for i, l := range s.data.Lists {
 		if l.ID == id {
 			s.data.Lists = append(s.data.Lists[:i], s.data.Lists[i+1:]...)
+			now := time.Now()
+			s.tombLocked(id, now)
 			for _, t := range s.data.Tasks {
 				if t.ListID == id {
 					t.ListID = ""
+					t.UpdatedAt = now
 				}
 			}
 			return s.saveLocked()
@@ -465,6 +516,7 @@ func (s *Store) CreateHabit(h *Habit) (*Habit, error) {
 	defer s.mu.Unlock()
 	h.ID = newID()
 	h.Done = map[string]bool{}
+	h.UpdatedAt = time.Now()
 	s.data.Habits = append(s.data.Habits, h)
 	return h, s.saveLocked()
 }
@@ -475,6 +527,7 @@ func (s *Store) DeleteHabit(id string) error {
 	for i, h := range s.data.Habits {
 		if h.ID == id {
 			s.data.Habits = append(s.data.Habits[:i], s.data.Habits[i+1:]...)
+			s.tombLocked(id, time.Now())
 			return s.saveLocked()
 		}
 	}
@@ -491,6 +544,7 @@ func (s *Store) ToggleHabit(id, date string) (*Habit, error) {
 			} else {
 				h.Done[date] = true
 			}
+			h.UpdatedAt = time.Now()
 			return h, s.saveLocked()
 		}
 	}
@@ -513,6 +567,7 @@ func (s *Store) SetNote(date, text string) error {
 	} else {
 		s.data.Notes[date] = text
 	}
+	s.data.NoteTimes[date] = time.Now() // удаление заметки — тоже правка
 	return s.saveLocked()
 }
 
@@ -524,6 +579,7 @@ func (s *Store) CreateSeries(sr *Series) (*Series, error) {
 	if sr.ID == "" {
 		sr.ID = newID()
 	}
+	sr.UpdatedAt = time.Now()
 	for i, old := range s.data.Series {
 		if old.ID == sr.ID {
 			s.data.Series[i] = sr
@@ -550,6 +606,7 @@ func (s *Store) Rollover(now time.Time) (int, error) {
 		case t.Carry == "move" || (t.Carry == "shift" && s.seriesLocked(t.Series) == nil):
 			t.Due = day
 			t.DueTime = ""
+			t.UpdatedAt = now
 			changed++
 		case t.Carry == "shift":
 			replan[t.Series] = true
@@ -613,6 +670,7 @@ func (s *Store) replanLocked(sr *Series, now time.Time) int {
 		if due := d.Format("2006-01-02"); t.Due != due {
 			t.Due = due
 			t.DueTime = ""
+			t.UpdatedAt = now
 			changed++
 		}
 		free--
@@ -687,7 +745,24 @@ func (s *Store) AddPomo(date string) error {
 func (s *Store) Replace(d Data) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	d.Sync = s.data.Sync // подключение к телефону или ПК — свойство устройства, а не данных
 	s.data = d
 	s.normalize()
+	now := time.Now() // импортированное должно победить при следующей синхронизации
+	for _, t := range s.data.Tasks {
+		t.UpdatedAt = now
+	}
+	for _, l := range s.data.Lists {
+		l.UpdatedAt = now
+	}
+	for _, h := range s.data.Habits {
+		h.UpdatedAt = now
+	}
+	for _, sr := range s.data.Series {
+		sr.UpdatedAt = now
+	}
+	for date := range s.data.Notes {
+		s.data.NoteTimes[date] = now
+	}
 	return s.saveLocked()
 }

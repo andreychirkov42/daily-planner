@@ -53,6 +53,8 @@ function viewSettings() {
         seg("data-close-set", a.closeAction, [["tray", "Свернуть в трей"], ["quit", "Закрыть программу"]]))}
     </section>` : ""}
 
+    ${syncCard(a)}
+
     ${nState === "unsupported" && android ? "" : `<section class="set-card"><h3>${icon("bell")} Уведомления</h3>
       ${setRow("Напоминания о дедлайнах", nText,
         nState === "off" ? `<button class="btn btn-sm btn-primary" data-set-notify>Включить</button>`
@@ -91,6 +93,7 @@ function viewSettings() {
 function bindSettings(root) {
   const box = root.querySelector("#setPomo");
   if (box) bindPomoSettings(box, pomo.client(), () => { toast("Длительности сохранены"); renderView(); });
+  bindSync(root);
 
   root.querySelector("[data-set-dayend]")?.addEventListener("change", e => {
     if (e.target.value) saveSettings({ dayEnd: e.target.value });
@@ -110,7 +113,8 @@ function bindSettings(root) {
 }
 
 function onSettingsClick(e) {
-  const b = e.target.closest("[data-theme-set], [data-close-set], [data-set-notify], [data-set-reveal], [data-set-help], [data-set-github]");
+  if (onSyncClick(e)) return true;
+  const b =e.target.closest("[data-theme-set], [data-close-set], [data-set-notify], [data-set-reveal], [data-set-help], [data-set-github]");
   if (!b) return false;
   const d = b.dataset;
   if (d.themeSet !== undefined) {

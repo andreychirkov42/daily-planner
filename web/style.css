@@ -758,3 +758,13 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .m .load .track { flex-basis: 100%; order: 5; min-width: 0; height: 6px; }
 .m .toast { bottom: 86px; max-width: calc(100vw - 32px); }
 .m .modal-card { max-height: calc(100vh - 32px); overflow-y: auto; }
+
+/* ---------- синхронизация с телефоном ---------- */
+.sync-input { width: 210px; }
+.m .sync-input { width: 100%; }
+.sync-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.sync-status { font-size: 13px; color: var(--ink-2); }
+.sync-status.err { color: var(--danger); }
+.sync-addrs { display: flex; flex-wrap: wrap; gap: 6px; }
+.sync-addrs code, .sync-code { background: var(--panel-2); border-radius: 8px; padding: 3px 8px; }
+.sync-code { font: 800 17px var(--font); letter-spacing: .12em; color: var(--accent); margin-right: 8px; }
