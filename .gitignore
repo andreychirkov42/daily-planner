@@ -23,3 +23,4 @@ android/app/build/
 android/app/src/main/jniLibs/
 
 data.json.bak*
+android/keystore.properties

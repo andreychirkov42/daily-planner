@@ -58,4 +58,5 @@
 - **Пушить на GitHub и выпускать релизы — только когда пользователь попросит** (или для действительно важного исправления, спросив). Локальные коммиты — нормально. Подпись коммита: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Визуальные изменения** (иконки, дизайн) — сначала показать пример (картинку или страницу-пример), применять только после выбора пользователя.
 - Не трогать антивирус, исключения Защитника и прочие настройки безопасности Windows — это решает пользователь.
+- APK в релиз: `.\build-android.ps1`, файл прикладывается как `"Clepsy.apk#Clepsy.apk (Android)"`. Версия APK — `versionCode`/`versionName` в `android/app/build.gradle.kts` (versionCode увеличивать на каждый релиз). Подпись — ключ из `android/keystore.properties` (см. `docs/ANDROID.md`). Пока `mobile` не слита в `main`, Android выходит предрелизами из `mobile` (`--prerelease --target mobile`, без `--latest`).
 - Перед сборкой релиза: `.\build.ps1`, затем `gh release create vX.Y.Z "<exe>#Clepsy.exe (Windows x64)" SHA256SUMS.txt --title "Clepsy vX.Y.Z" --notes-file <файл> --latest --target main` (имя файла в релизе — латиницей).
