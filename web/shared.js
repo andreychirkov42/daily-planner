@@ -144,7 +144,7 @@ function pomoSettingsHTML(set) {
   return `<div class="pset">
     <div class="pset-presets">${POMO_PRESETS.map(([w, s, l]) => `<button type="button" class="pset-chip ${set.work === w && set.short === s && set.long === l ? "on" : ""}" data-preset="${w},${s},${l}">${w}/${s}</button>`).join("")}</div>
     ${num("work", "Фокус", 180, "мин")}${num("short", "Перерыв", 60, "мин")}${num("long", "Длинный перерыв", 120, "мин")}
-    ${num("longEvery", "Длинный после", 12, "фокусов")}
+    ${num("longEvery", "Длинный после", 12, "сессий")}
     <label class="pset-row pset-check"><input type="checkbox" data-pset="autoBreak" ${set.autoBreak ? "checked" : ""}><span>Перерыв запускается сам</span></label>
     <div class="pset-err" data-pset-err></div>
     <div class="pset-actions"><button type="button" class="pset-cancel" data-pset-cancel>Отмена</button><button type="button" class="pset-save" data-pset-save>Сохранить</button></div>
