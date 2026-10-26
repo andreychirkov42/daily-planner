@@ -93,7 +93,7 @@ var openAppWindow func(view string) bool
 var setAppTheme func(dark bool)
 
 const (
-	appVersion = "1.1.1"
+	appVersion = "1.1.2"
 	repoURL    = "https://github.com/andreychirkov42/daily-planner"
 )
 
