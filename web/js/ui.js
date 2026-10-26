@@ -35,20 +35,30 @@ function checkDeadlines() {
     if (seen[key]) continue;
     seen[key] = 1;
     notify("Дедлайн: " + t.title, `Срок — сегодня в ${t.dueTime}`);
-    toast(`Дедлайн: ${t.title}`);
+    toast(`Дедлайн: ${t.title}`, { kind: "deadline", ms: 8000 });
   }
   safeSet("notified", JSON.stringify(seen));
   renderNav();
 }
 
+// Вид подсказки: от него цвет полосы и фона (стили .t-*) и иконка.
+const TOAST_ICONS = { info: "check", done: "done", error: "alert", delete: "trash", repeat: "repeat", date: "date", update: "download", deadline: "bell", pomo: "timer" };
+
 let toastTimer;
-function toast(text, actionText, action, ms) {
+// toast(текст, { kind, action: [подпись, функция], ms }); полоска снизу показывает, сколько подсказка ещё провисит
+function toast(text, opts = {}) {
   const el = $("#toast");
-  el.innerHTML = `<span>${esc(text)}</span>${actionText ? `<button>${esc(actionText)}</button>` : ""}`;
+  const kind = TOAST_ICONS[opts.kind] ? opts.kind : "info";
+  const ms = opts.ms || (opts.action ? 5000 : 2600);
+  el.className = "toast t-" + kind;
+  el.style.setProperty("--ms", ms + "ms");
+  el.innerHTML = `<span class="t-ic">${icon(TOAST_ICONS[kind])}</span><span class="t-tx">${esc(text)}</span>` +
+    (opts.action ? `<button>${esc(opts.action[0])}</button>` : "") + `<i class="t-bar"></i>`;
   el.hidden = false;
-  if (actionText) el.querySelector("button").onclick = () => { el.hidden = true; action(); };
+  el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; // новая поверх старой — появиться заново
+  if (opts.action) el.querySelector("button").onclick = () => { el.hidden = true; opts.action[1](); };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), ms || (actionText ? 5000 : 2600));
+  toastTimer = setTimeout(() => (el.hidden = true), ms);
 }
 
 /* ================= тема ================= */

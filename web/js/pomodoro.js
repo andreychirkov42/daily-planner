@@ -17,7 +17,7 @@ const pomo = (() => {
   }
   function finished(st) {
     // звук играет мини-панель в трее, здесь только подсказка
-    toast(st.finished === "work" ? "Помидор готов! Перерыв уже идёт" : "Перерыв окончен — за работу!");
+    toast(st.finished === "work" ? "Помидор готов, перерыв уже идёт" : "Перерыв окончен — за работу", { kind: "pomo" });
     S.pomos[today()] = st.count;
   }
   return {

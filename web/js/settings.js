@@ -109,8 +109,8 @@ function bindSettings(root) {
       if (!confirm("Заменить все текущие данные данными из файла?")) return;
       await api("POST", "/import", data);
       await load();
-      toast("Данные импортированы");
-    } catch { toast("Не удалось прочитать файл"); }
+      toast("Данные импортированы", { kind: "done" });
+    } catch { toast("Не удалось прочитать файл", { kind: "error" }); }
   });
 }
 
@@ -131,7 +131,7 @@ function onSettingsClick(e) {
 }
 
 async function enableNotifications() {
-  if (!("Notification" in window)) return toast("Браузер не поддерживает уведомления");
+  if (!("Notification" in window)) return toast("Браузер не поддерживает уведомления", { kind: "error" });
   const p = await Notification.requestPermission();
-  toast(p === "granted" ? "Напоминания о дедлайнах включены" : "Уведомления запрещены в браузере");
+  toast(p === "granted" ? "Напоминания о дедлайнах включены" : "Уведомления запрещены в браузере", { kind: p === "granted" ? "done" : "error" });
 }

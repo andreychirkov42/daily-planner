@@ -25,12 +25,12 @@ function onUpdateInfo() {
     // только что обновились: описание изменений придёт с первой проверкой — ждём её немного
     if (u.latest !== u.current && updatedRetries++ < 6) { setTimeout(loadUpdate, 5000); return; }
     safeSet("updatedNotice", u.current);
-    if (u.latest === u.current && u.notes) toast(`Clepsy обновлён до версии ${u.current}`, "Что нового", () => showNotes(false), 15000);
-    else toast(`Clepsy обновлён до версии ${u.current}`);
+    if (u.latest === u.current && u.notes) toast(`Clepsy обновлён до версии ${u.current}`, { kind: "update", action: ["Что нового", () => showNotes(false)], ms: 15000 });
+    else toast(`Clepsy обновлён до версии ${u.current}`, { kind: "update" });
   }
   if (u.state === "ready" && safeGet("updateOffered") !== u.latest) {
     safeSet("updateOffered", u.latest);
-    toast(`Готова новая версия ${u.latest}`, "Подробнее", () => showNotes(true), 15000);
+    toast(`Готова новая версия ${u.latest}`, { kind: "update", action: ["Подробнее", () => showNotes(true)], ms: 15000 });
   }
 }
 window.clepsyUpdate = info => { updateInfo = info; onUpdateInfo(); }; // зовёт оболочка Android
@@ -47,7 +47,7 @@ function installUpdate() {
   if (onAndroid()) { ClepsyAndroid.installUpdate(); return; }
   updateInfo = { ...updateInfo, state: "installing" };
   if (S.view === "settings") renderView();
-  toast("Ставлю обновление — Clepsy перезапустится");
+  toast("Ставлю обновление — Clepsy перезапустится", { kind: "update" });
   api("POST", "/update/install").catch(() => {});
   // в браузере страница переживает перезапуск сервера — дождёмся новой версии и перезагрузимся
   const was = updateInfo.current;

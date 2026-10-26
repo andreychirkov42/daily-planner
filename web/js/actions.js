@@ -31,7 +31,7 @@ async function toggleTask(id) {
   if (next) { S.tasks.push(next); S.enter.add(next.id); }
   if (task.done) {
     chime();
-    if (next) toast(`Следующий повтор: ${humanDate(next.due)}`);
+    if (next) toast(`Следующий повтор: ${humanDate(next.due)}`, { kind: "repeat" });
     if (el) maybeCelebrate(el);
   }
   if (el && el.isConnected && S.selected !== id) {
@@ -62,7 +62,7 @@ function maybeCelebrate(el) {
       { transform: `translate(${Math.cos(ang) * dist}px, ${Math.sin(ang) * dist + 120}px) rotate(${Math.random() * 720}deg)`, opacity: 0 },
     ], { duration: 900 + Math.random() * 500, easing: "cubic-bezier(.2,.7,.4,1)" }).finished.then(() => c.remove());
   }
-  setTimeout(() => toast("Все задачи на сегодня выполнены!"), 500);
+  setTimeout(() => toast("Все задачи на сегодня выполнены", { kind: "done" }), 500);
 }
 
 function greeting() {
@@ -76,11 +76,11 @@ async function deleteTask(id) {
   S.tasks = S.tasks.filter(x => x.id !== id);
   if (S.selected === id) S.selected = null;
   render();
-  toast(`Удалено «${t.title}»`, "Вернуть", async () => {
+  toast(`Удалено «${t.title}»`, { kind: "delete", action: ["Вернуть", async () => {
     const back = await api("POST", "/tasks", t);
     S.tasks.push(back);
     render();
-  });
+  }] });
 }
 
 function flash(id) {
@@ -156,7 +156,7 @@ async function clearCompleted() {
   if (!confirm("Удалить все выполненные задачи навсегда?")) return;
   const { removed } = await api("POST", "/tasks/clear-completed");
   S.tasks = S.tasks.filter(t => !t.done);
-  render(); toast(`Удалено задач: ${removed}`);
+  render(); toast(`Удалено задач: ${removed}`, { kind: "delete" });
 }
 
 /* ================= drag & drop ================= */
@@ -209,7 +209,7 @@ async function onDrop(e) {
   if (cls === "drop") {
     if (el.dataset.day) {
       t.due = el.dataset.day;
-      toast(`Перенесено на ${humanDate(t.due)}`);
+      toast(`Перенесено на ${humanDate(t.due)}`, { kind: "date" });
     } else if (el.dataset.time) {
       t.due = S.schedDay || today();
       t.dueTime = el.dataset.time;

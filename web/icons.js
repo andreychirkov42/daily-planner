@@ -10,6 +10,7 @@ const ICONS = {
   list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   dots: '<path d="M12 5h.01M12 12h.01M12 19h.01"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.5h.01"/>',
   board: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 7.5v8M12 7.5v4.5M16 7.5v6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
   calendar: '<rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/>',

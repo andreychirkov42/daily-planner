@@ -78,8 +78,8 @@ function onSyncClick(e) {
 // телефон: сохраняет адрес и код (если их меняли) и сразу синхронизируется
 async function saveAndSync() {
   const peer = $("[data-sync-peer]").value.trim(), code = $("[data-sync-code]").value.trim();
-  if (!peer) return toast("Введи адрес компьютера");
-  if (!code && !syncInfo.hasPeerCode) return toast("Введи код с компьютера");
+  if (!peer) return toast("Введи адрес компьютера", { kind: "error" });
+  if (!code && !syncInfo.hasPeerCode) return toast("Введи код с компьютера", { kind: "error" });
   const patch = {};
   if (peer !== syncInfo.peer) patch.peer = peer;
   if (code) patch.peerCode = code;
@@ -98,7 +98,7 @@ async function runSync(manual) {
       syncInfo = body.sync;
       if (body.changed) await load();
     } else {
-      if (manual) toast(body.error || "Не удалось синхронизировать");
+      if (manual) toast(body.error || "Не удалось синхронизировать", { kind: "error" });
       await loadSync();
     }
   } catch { /* сервер перезапускается */ }

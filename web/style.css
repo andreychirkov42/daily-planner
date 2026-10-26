@@ -434,13 +434,34 @@ textarea.input { min-height: 90px; resize: vertical; }
 .help-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; font-size: 14px; }
 .help-list { margin: 0 0 18px; padding-left: 18px; font-size: 14px; color: var(--ink-2); }
 kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 0 7px; font: 600 12px var(--font); }
+/* подсказка: мягкий фон и полоса в цвет сообщения, снизу — сколько ещё провисит */
 .toast {
-  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; box-shadow: var(--shadow-lg);
-  display: flex; gap: 14px; align-items: center; font-size: 14px; font-weight: 600; z-index: 60; animation: pop .2s;
+  --tc: var(--accent);
+  /* по центру без left: 50% — иначе браузер даёт подсказке только половину окна и текст ломается в столбик */
+  position: fixed; bottom: 22px; left: 0; right: 0; margin: 0 auto; z-index: 60;
+  display: flex; gap: 10px; align-items: center; overflow: hidden;
+  width: max-content; max-width: min(440px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 10px 10px 16px;
+  background: color-mix(in srgb, var(--tc) 13%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent); border-radius: 12px;
+  box-shadow: var(--shadow-lg); color: var(--ink); font-size: 14px; font-weight: 600;
+  animation: toast-in .22s cubic-bezier(.2, .8, .3, 1);
 }
 .toast[hidden] { display: none; }
-.toast button { background: none; border: 0; color: var(--accent); font-weight: 800; }
+.toast::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tc); }
+.toast .t-ic { flex: none; display: grid; color: var(--tc); }
+.toast .t-ic .i { width: 18px; height: 18px; }
+.toast .t-tx { flex: 1; min-width: 0; line-height: 1.35; padding-right: 6px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.toast button { flex: none; white-space: nowrap; background: none; border: 0; border-radius: 8px; padding: 5px 8px; color: var(--ta, var(--tc)); font-weight: 800; }
+.toast button:hover { background: color-mix(in srgb, var(--ta, var(--tc)) 14%, transparent); }
+.toast .t-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--tc); opacity: .55; transform-origin: left; animation: toast-time var(--ms, 2600ms) linear forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes toast-time { to { transform: scaleX(0); } }
+.toast.t-error { --tc: var(--danger); }
+.toast.t-delete { --tc: var(--p1); --ta: var(--accent); }
+.toast.t-update { --tc: var(--accent-2); }
+.toast.t-deadline { --tc: var(--warn); }
+.toast.t-done { --tc: var(--ok); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {

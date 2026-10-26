@@ -134,7 +134,7 @@ async function api(method, path, body) {
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).error || msg; } catch { /* пусто */ }
-    toast("Ошибка: " + msg);
+    toast(msg, { kind: "error" });
     throw new Error(msg);
   }
   return res.status === 204 ? null : res.json();
