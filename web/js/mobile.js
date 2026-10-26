@@ -156,6 +156,7 @@ function onMobileClick(e) {
 window.clepsyBack = () => {
   if (!$("#mBackdrop").hidden) { closeSheets(); return true; }
   if (!$("#helpModal").hidden) { $("#helpModal").hidden = true; return true; }
+  if (!$("#notesModal").hidden) { $("#notesModal").hidden = true; return true; }
   if (!$("#planModal").hidden) { $("#planModal").hidden = true; render(); return true; }
   if (S.selected) { S.selected = null; render(); return true; }
   if (S.view !== "today") { setView(tabOf(S.view) === "more" && S.view !== "more" ? "more" : "today"); return true; }

@@ -771,3 +771,11 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 
 /* ---------- обновления ---------- */
 .upd-err { color: var(--danger); }
+.notes-card { max-width: 520px; }
+.notes-body { max-height: 55vh; overflow-y: auto; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.notes-body h4 { margin: 14px 0 4px; font-size: 14px; color: var(--ink); }
+.notes-body h4:first-child { margin-top: 0; }
+.notes-body ul { margin: 0 0 6px; padding-left: 18px; }
+.notes-body p { margin: 0 0 8px; }
+.notes-body code { background: var(--panel-2); border-radius: 5px; padding: 0 4px; font-size: 12.5px; }
+.notes-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

@@ -1,9 +1,11 @@
 package main
 
-// Автообновление. Раз в 6 часов Clepsy спрашивает у GitHub последний релиз; если версия новее,
-// скачивает файл для своей системы, сверяет его с SHA256SUMS.txt того же релиза и ставит:
-// на Windows — подменяет exe и перезапускается (update_windows.go), когда программой не пользуются.
-// На Android проверку и установку делает оболочка на Java: у Go-сервера на телефоне нет DNS.
+// Автообновление (по образцу Tauri updater). В каждом релизе лежит манифест latest.json: версия,
+// описание изменений и для каждой платформы ссылка на файл с его SHA-256. Манифест подписан
+// ключом автора (latest.json.sig, ed25519). Clepsy читает его по постоянной ссылке
+// releases/latest/download/latest.json — это обычное скачивание, без API GitHub и его лимитов.
+// Windows: новая версия скачивается, сверяется и ставится подменой exe с перезапуском
+// (update_windows.go), когда программой не пользуются. Android: то же делает оболочка на Java.
 
 import (
 	"context"
@@ -24,42 +26,36 @@ import (
 )
 
 const (
-	releasesAPI    = "https://api.github.com/repos/andreychirkov42/daily-planner/releases/latest"
+	manifestURL    = repoURL + "/releases/latest/download/latest.json"
 	updateEvery    = 6 * time.Hour
 	maxUpdateBytes = 200 << 20
 )
 
-// updatePubKey — открытый ключ подписи релизов (tools/signsums). SHA256SUMS.txt должен быть подписан
-// закрытым ключом, который хранится только у автора (не на GitHub): даже со взломанным аккаунтом GitHub
-// подменённый exe не поставится. Переменная — чтобы тесты подставили свой ключ.
+// updatePubKey — открытый ключ подписи манифеста (tools/release). Закрытый ключ хранится только
+// у автора (не на GitHub): даже со взломанным аккаунтом GitHub подменённый exe не поставится.
+// Переменная — чтобы тесты подставили свой ключ.
 var updatePubKey = "4c249d0e7f5811889d3a917287edb99ccb5591d92c1914d971679d2e31168ff4"
 
-// updateAPI — адрес «последнего релиза»; в тестах подменяется на свой сервер.
-func updateAPI() string {
+// updateManifestURL — адрес latest.json; в тестах подменяется на свой сервер.
+func updateManifestURL() string {
 	if u := os.Getenv("CLEPSY_UPDATE_URL"); u != "" {
 		return u
 	}
-	return releasesAPI
+	return manifestURL
 }
 
-type release struct {
-	Tag     string `json:"tag_name"`
-	Body    string `json:"body"`
-	HTMLURL string `json:"html_url"`
-	Assets  []struct {
-		Name string `json:"name"`
-		URL  string `json:"browser_download_url"`
-		Size int64  `json:"size"`
-	} `json:"assets"`
+// Manifest — latest.json. Его же пишет tools/release при выпуске.
+type Manifest struct {
+	Version   string                   `json:"version"`
+	PubDate   string                   `json:"pub_date"`
+	Notes     string                   `json:"notes"` // что нового, Markdown
+	Platforms map[string]PlatformBuild `json:"platforms"`
 }
 
-func (r *release) asset(name string) (string, bool) {
-	for _, a := range r.Assets {
-		if a.Name == name {
-			return a.URL, true
-		}
-	}
-	return "", false
+type PlatformBuild struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
 }
 
 // parseVersion разбирает «v1.2.0-beta.1» на числа и метку предварительной версии.
@@ -103,17 +99,6 @@ func newerVersion(a, b string) bool {
 	return pa > pb
 }
 
-// sumFor находит хэш файла в SHA256SUMS.txt («<hex>  <имя>»).
-func sumFor(sums, name string) (string, bool) {
-	for _, line := range strings.Split(sums, "\n") {
-		f := strings.Fields(line)
-		if len(f) == 2 && strings.TrimPrefix(f[1], "*") == name {
-			return strings.ToLower(f[0]), true
-		}
-	}
-	return "", false
-}
-
 var updateClient = &http.Client{Timeout: 5 * time.Minute}
 
 func httpGet(ctx context.Context, url string, limit int64) ([]byte, error) {
@@ -122,12 +107,14 @@ func httpGet(ctx context.Context, url string, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Clepsy/"+appVersion)
-	req.Header.Set("Accept", "application/vnd.github+json")
 	res, err := updateClient.Do(req)
 	if err != nil {
 		return nil, errors.New("нет связи с GitHub")
 	}
 	defer res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		return nil, errors.New("в последнем релизе нет latest.json — обнови вручную со страницы релизов")
+	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub ответил %d", res.StatusCode)
 	}
@@ -141,64 +128,56 @@ func httpGet(ctx context.Context, url string, limit int64) ([]byte, error) {
 	return b, nil
 }
 
-func fetchLatest(ctx context.Context) (*release, error) {
-	b, err := httpGet(ctx, updateAPI(), 1<<20)
-	if err != nil {
-		return nil, err
-	}
-	var r release
-	if err := json.Unmarshal(b, &r); err != nil || r.Tag == "" {
-		return nil, errors.New("непонятный ответ GitHub")
-	}
-	return &r, nil
-}
-
-// verifySums проверяет подпись SHA256SUMS.txt ключом автора.
-func verifySums(sums, sigHex []byte) bool {
+// verifySig проверяет подпись автора (hex ed25519) над данными.
+func verifySig(data, sigHex []byte) bool {
 	pub, err1 := hex.DecodeString(updatePubKey)
 	sig, err2 := hex.DecodeString(strings.TrimSpace(string(sigHex)))
-	return err1 == nil && err2 == nil && len(pub) == ed25519.PublicKeySize && ed25519.Verify(pub, sums, sig)
+	return err1 == nil && err2 == nil && len(pub) == ed25519.PublicKeySize && ed25519.Verify(pub, data, sig)
 }
 
-// fetchVerified скачивает файл релиза и проверяет его по SHA256SUMS.txt того же релиза,
-// а сам SHA256SUMS.txt — по подписи автора (SHA256SUMS.txt.sig).
-func fetchVerified(ctx context.Context, r *release, name string) ([]byte, error) {
-	sumsURL, ok1 := r.asset("SHA256SUMS.txt")
-	sigURL, ok2 := r.asset("SHA256SUMS.txt.sig")
-	fileURL, ok3 := r.asset(name)
-	if !ok1 || !ok2 || !ok3 {
-		return nil, fmt.Errorf("в релизе %s нет %s, SHA256SUMS.txt или подписи — обнови вручную со страницы релизов", r.Tag, name)
-	}
-	sums, err := httpGet(ctx, sumsURL, 64<<10)
+// fetchManifest скачивает latest.json и его подпись; без верной подписи манифесту не верим.
+func fetchManifest(ctx context.Context) (*Manifest, error) {
+	url := updateManifestURL()
+	data, err := httpGet(ctx, url, 1<<20)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := httpGet(ctx, sigURL, 1<<10)
+	sig, err := httpGet(ctx, url+".sig", 1<<10)
 	if err != nil {
 		return nil, err
 	}
-	if !verifySums(sums, sig) {
-		return nil, errors.New("подпись релиза не сошлась — файл не от автора Clepsy, не устанавливаю")
+	if !verifySig(data, sig) {
+		return nil, errors.New("подпись релиза не сошлась — он не от автора Clepsy, не устанавливаю")
 	}
-	want, ok := sumFor(string(sums), name)
-	if !ok {
-		return nil, fmt.Errorf("в SHA256SUMS.txt нет %s", name)
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil || m.Version == "" {
+		return nil, errors.New("непонятный latest.json")
 	}
-	b, err := httpGet(ctx, fileURL, maxUpdateBytes)
+	return &m, nil
+}
+
+// fetchBuild скачивает файл своей платформы и сверяет его SHA-256 с подписанным манифестом.
+func fetchBuild(ctx context.Context, m *Manifest, platform string) ([]byte, error) {
+	p, ok := m.Platforms[platform]
+	if !ok || p.URL == "" || p.SHA256 == "" {
+		return nil, fmt.Errorf("в версии %s нет сборки для этой системы", m.Version)
+	}
+	b, err := httpGet(ctx, p.URL, maxUpdateBytes)
 	if err != nil {
 		return nil, err
 	}
 	got := sha256.Sum256(b)
-	if hex.EncodeToString(got[:]) != want {
+	if hex.EncodeToString(got[:]) != strings.ToLower(p.SHA256) {
 		return nil, errors.New("контрольная сумма не совпала — файл повреждён или подменён, не устанавливаю")
 	}
 	return b, nil
 }
 
-// UpdateState — что показывает раздел «Настройки → Обновления».
+// UpdateState — что показывает раздел «Настройки → Обновления» и окно «Что нового».
 type UpdateState struct {
 	Current     string    `json:"current"`
 	Latest      string    `json:"latest,omitempty"`
+	Notes       string    `json:"notes,omitempty"` // что нового в Latest
 	Available   bool      `json:"available"`
 	State       string    `json:"state"` // "", checking, downloading, ready, installing, error
 	Err         string    `json:"error,omitempty"`
@@ -218,7 +197,7 @@ type updater struct {
 }
 
 func newUpdater(s *Store, p *Pomodoro, updatedFrom string) *updater {
-	return &updater{store: s, pomo: p, st: UpdateState{Current: appVersion, UpdatedFrom: updatedFrom, CanInstall: updateAsset != ""}}
+	return &updater{store: s, pomo: p, st: UpdateState{Current: appVersion, UpdatedFrom: updatedFrom, CanInstall: updatePlatform != ""}}
 }
 
 func (u *updater) state() UpdateState {
@@ -233,7 +212,7 @@ func (u *updater) set(f func(*UpdateState)) {
 	f(&u.st)
 }
 
-// check узнаёт последнюю версию и, если она новее и эта сборка умеет ставить, скачивает её.
+// check читает манифест и, если версия новее и эта сборка умеет ставить, скачивает её.
 func (u *updater) check(ctx context.Context) error {
 	u.mu.Lock()
 	if u.st.State == "checking" || u.st.State == "downloading" || u.st.State == "installing" {
@@ -244,39 +223,39 @@ func (u *updater) check(ctx context.Context) error {
 	u.mu.Unlock()
 
 	err := func() error {
-		r, err := fetchLatest(ctx)
+		m, err := fetchManifest(ctx)
 		if err != nil {
 			return err
 		}
-		avail := newerVersion(r.Tag, appVersion)
+		avail := newerVersion(m.Version, appVersion)
 		u.set(func(s *UpdateState) {
-			s.Latest, s.Available, s.Checked = strings.TrimPrefix(r.Tag, "v"), avail, time.Now()
+			s.Latest, s.Notes, s.Available, s.Checked = m.Version, m.Notes, avail, time.Now()
 		})
-		if !avail || updateAsset == "" {
+		if !avail || updatePlatform == "" {
 			return nil
 		}
 		u.mu.Lock()
-		have := u.ready != nil && u.readyFor == r.Tag // уже скачана именно эта версия, а не прошлая
+		have := u.ready != nil && u.readyFor == m.Version // уже скачана именно эта версия, а не прошлая
 		u.mu.Unlock()
 		if have {
 			return nil
 		}
 		u.set(func(s *UpdateState) { s.State = "downloading" })
-		b, err := fetchVerified(ctx, r, updateAsset)
+		b, err := fetchBuild(ctx, m, updatePlatform)
 		if err != nil {
 			return err
 		}
 		u.mu.Lock()
-		u.ready, u.readyFor = b, r.Tag
+		u.ready, u.readyFor = b, m.Version
 		u.mu.Unlock()
-		log.Printf("обновление %s скачано и проверено", r.Tag)
+		log.Printf("обновление %s скачано и проверено", m.Version)
 		return nil
 	}()
 	u.set(func(s *UpdateState) {
 		switch {
 		case err != nil:
 			s.State, s.Err = "error", err.Error()
-		case s.Available && updateAsset != "":
+		case s.Available && updatePlatform != "":
 			s.State = "ready"
 		default:
 			s.State = ""
@@ -315,11 +294,14 @@ func (u *updater) idle() bool {
 }
 
 // loop — фоновая проверка: вскоре после запуска, потом раз в 6 часов; скачанное ставится,
-// как только программа освободится (проверяем каждые 5 минут).
+// как только программа освободится (проверяем каждые 5 минут). Сразу после обновления
+// проверяем без ожидания — чтобы показать «Что нового» в только что поставленной версии.
 func (u *updater) loop() {
-	time.Sleep(time.Minute)
+	if u.state().UpdatedFrom == "" {
+		time.Sleep(time.Minute)
+	}
 	for {
-		if u.autoOn() {
+		if u.autoOn() || u.state().UpdatedFrom != "" && u.state().Checked.IsZero() {
 			if st := u.state(); time.Since(st.Checked) > updateEvery || st.State == "error" && time.Since(st.Checked) > time.Hour {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 				if err := u.check(ctx); err != nil {
@@ -328,7 +310,7 @@ func (u *updater) loop() {
 				}
 				cancel()
 			}
-			if u.state().State == "ready" && u.idle() {
+			if u.autoOn() && u.state().State == "ready" && u.idle() {
 				if err := u.install(); err != nil {
 					log.Printf("обновление: %v", err)
 				}

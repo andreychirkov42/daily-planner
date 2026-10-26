@@ -115,7 +115,14 @@ public class MainActivity extends Activity {
         CookieManager cm = CookieManager.getInstance();
         cm.setCookie(HOME, "clepsy=" + token + "; Path=/; HttpOnly; SameSite=Strict");
         cm.flush();
-        if (updater == null) updater = new Updater(getApplicationContext(), versionName());
+        if (updater == null) {
+            updater = new Updater(getApplicationContext(), versionName());
+            // версия сменилась с прошлого запуска — значит, только что обновились
+            SharedPreferences p = getSharedPreferences("clepsy", MODE_PRIVATE);
+            String last = p.getString("lastVersion", "");
+            if (!last.isEmpty() && !last.equals(updater.current)) updater.updatedFrom = last;
+            p.edit().putString("lastVersion", updater.current).apply();
+        }
         current = new java.lang.ref.WeakReference<>(this);
 
         new Thread(() -> {
@@ -268,7 +275,8 @@ public class MainActivity extends Activity {
     private void autoUpdate() {
         SharedPreferences p = getSharedPreferences("clepsy", MODE_PRIVATE);
         long now = System.currentTimeMillis();
-        if (now - p.getLong("updateChecked", 0) < UPDATE_EVERY || !autoUpdateOn()) return;
+        boolean justUpdated = !updater.updatedFrom.isEmpty(); // проверка сразу — за описанием «Что нового»
+        if (!justUpdated && (now - p.getLong("updateChecked", 0) < UPDATE_EVERY || !autoUpdateOn())) return;
         p.edit().putLong("updateChecked", now).apply();
         updater.check();
         pushUpdate();

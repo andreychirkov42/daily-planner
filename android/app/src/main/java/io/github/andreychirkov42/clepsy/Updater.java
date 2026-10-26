@@ -2,7 +2,6 @@ package io.github.andreychirkov42.clepsy;
 
 import android.content.Context;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -15,18 +14,19 @@ import java.net.URL;
 import java.security.MessageDigest;
 
 /**
- * Обновление приложения из релизов GitHub: узнать последнюю версию, скачать Clepsy.apk
- * и сверить его с SHA256SUMS.txt того же релиза. Ставит APK системный установщик (MainActivity).
- * Проверка — здесь, а не в Go-сервере: у него на телефоне нет DNS.
+ * Обновление приложения из релизов GitHub: прочитать манифест latest.json последнего релиза
+ * (по постоянной ссылке, без API GitHub), скачать сборку "android" и сверить её SHA-256 с манифестом.
+ * Ставит APK системный установщик (MainActivity); подмену отсекает сама система — обновление
+ * принимается только с той же подписью APK. Проверка — здесь, а не в Go-сервере: у него на телефоне нет DNS.
  */
 final class Updater {
-    static final String API = "https://api.github.com/repos/andreychirkov42/daily-planner/releases/latest";
-    static final String ASSET = "Clepsy.apk";
+    static final String MANIFEST = "https://github.com/andreychirkov42/daily-planner/releases/latest/download/latest.json";
     static final long MAX_APK = 200L << 20;
 
     final Context ctx;
     final String current;
-    String latest = "", state = "", error = "";
+    String latest = "", notes = "", state = "", error = "";
+    String updatedFrom = ""; // с какой версии обновились (страница покажет «Что нового»)
     boolean available;
     long checked;
 
@@ -46,8 +46,9 @@ final class Updater {
     synchronized JSONObject json() {
         JSONObject o = new JSONObject();
         try {
-            o.put("current", current).put("latest", latest).put("available", available)
+            o.put("current", current).put("latest", latest).put("notes", notes).put("available", available)
                     .put("state", state).put("error", error).put("canInstall", true);
+            if (!updatedFrom.isEmpty()) o.put("updatedFrom", updatedFrom);
             if (checked > 0) o.put("checked", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US).format(new java.util.Date(checked)));
         } catch (Exception ignored) {
         }
@@ -62,28 +63,22 @@ final class Updater {
             error = "";
         }
         try {
-            JSONObject r = new JSONObject(new String(get(API, 1 << 20), "UTF-8"));
-            String tag = r.getString("tag_name").replaceFirst("^v", "");
-            String apkUrl = null, sumsUrl = null;
-            JSONArray assets = r.getJSONArray("assets");
-            for (int i = 0; i < assets.length(); i++) {
-                JSONObject a = assets.getJSONObject(i);
-                if (ASSET.equals(a.getString("name"))) apkUrl = a.getString("browser_download_url");
-                if ("SHA256SUMS.txt".equals(a.getString("name"))) sumsUrl = a.getString("browser_download_url");
-            }
-            boolean avail = newer(tag, current);
+            JSONObject m = new JSONObject(new String(get(MANIFEST, 1 << 20), "UTF-8"));
+            String version = m.getString("version").replaceFirst("^v", "");
+            JSONObject build = m.optJSONObject("platforms") == null ? null : m.getJSONObject("platforms").optJSONObject("android");
+            boolean avail = newer(version, current);
             synchronized (this) {
-                latest = tag;
+                latest = version;
+                notes = m.optString("notes", "");
                 available = avail;
                 checked = System.currentTimeMillis();
                 state = avail ? "downloading" : "";
             }
             if (!avail) return;
-            if (apkUrl == null || sumsUrl == null) throw new IOException("в релизе нет Clepsy.apk или SHA256SUMS.txt");
-            String want = sumFor(new String(get(sumsUrl, 64 << 10), "UTF-8"), ASSET);
-            if (want == null) throw new IOException("в SHA256SUMS.txt нет Clepsy.apk");
-            byte[] b = get(apkUrl, MAX_APK);
-            if (!want.equals(sha256(b))) throw new IOException("контрольная сумма не совпала — файл повреждён или подменён, не устанавливаю");
+            if (build == null) throw new IOException("в версии " + version + " нет сборки для Android");
+            byte[] b = get(build.getString("url"), MAX_APK);
+            if (!build.getString("sha256").toLowerCase(java.util.Locale.ROOT).equals(sha256(b)))
+                throw new IOException("контрольная сумма не совпала — файл повреждён или подменён, не устанавливаю");
             try (FileOutputStream f = new FileOutputStream(apk())) {
                 f.write(b);
             }
@@ -104,8 +99,8 @@ final class Updater {
         c.setConnectTimeout(15000);
         c.setReadTimeout(60000);
         c.setRequestProperty("User-Agent", "Clepsy-Android");
-        c.setRequestProperty("Accept", "application/vnd.github+json");
         try {
+            if (c.getResponseCode() == 404) throw new IOException("в последнем релизе нет latest.json — обнови вручную со страницы релизов");
             if (c.getResponseCode() != 200) throw new IOException("GitHub ответил " + c.getResponseCode());
             try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 byte[] buf = new byte[64 << 10];
@@ -122,14 +117,6 @@ final class Updater {
         } finally {
             c.disconnect();
         }
-    }
-
-    static String sumFor(String sums, String name) {
-        for (String line : sums.split("\n")) {
-            String[] f = line.trim().split("\\s+");
-            if (f.length == 2 && f[1].replaceFirst("^\\*", "").equals(name)) return f[0].toLowerCase(java.util.Locale.ROOT);
-        }
-        return null;
     }
 
     static String sha256(byte[] b) throws Exception {

@@ -5,7 +5,7 @@ package main
 import "errors"
 
 // На других системах сервер сам не обновляется: на Android это делает оболочка на Java.
-const updateAsset = ""
+const updatePlatform = ""
 
 func installUpdate([]byte) error {
 	return errors.New("обновление ставится только на Windows")

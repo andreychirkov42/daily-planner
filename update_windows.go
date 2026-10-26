@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// updateAsset — какой файл релиза нужен этой сборке.
-const updateAsset = "Clepsy.exe"
+// updatePlatform — ключ сборки этой системы в latest.json.
+const updatePlatform = "windows-x86_64"
 
 // installUpdate кладёт новую версию на место exe. Запущенный exe Windows не даёт перезаписать,
 // но даёт переименовать: старый уходит в Clepsy.exe.old (его удалит новая версия при запуске).

@@ -68,6 +68,7 @@ function init() {
     if (e.key === "Escape") {
       if (!$("#mBackdrop").hidden) closeSheets();
       else if (!$("#helpModal").hidden) $("#helpModal").hidden = true;
+      else if (!$("#notesModal").hidden) $("#notesModal").hidden = true;
       else if (!$("#planModal").hidden) { $("#planModal").hidden = true; render(); }
       else if (S.selected) { S.selected = null; render(); }
       else if (typing) e.target.blur();
