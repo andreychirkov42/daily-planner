@@ -40,6 +40,6 @@ const pomo = (() => {
       };
       bindPomoSettings(box, c, close);
     },
-    focus(text) { c.mode("work", text).then(() => c.start()); toast("Фокус-сессия запущена"); },
+    focus(text) { c.mode("work", text).then(() => c.start()); },
   };
 })();

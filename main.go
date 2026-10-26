@@ -268,10 +268,6 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 		revealFile(s.path)
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("POST /api/app/github", func(w http.ResponseWriter, r *http.Request) {
-		openBrowser(repoURL) // только этот адрес — чтобы API не открывал произвольные ссылки
-		w.WriteHeader(http.StatusNoContent)
-	})
 	mux.HandleFunc("POST /api/app/theme", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Dark bool }
 		if !readJSON(w, r, &body) {
@@ -442,7 +438,6 @@ func settingsView(s *Store) map[string]any {
 		"closeAction": a.CloseAction,
 		"dayEnd":      a.DayEnd,
 		"version":     appVersion,
-		"repo":        repoURL,
 		"dataPath":    s.path,
 		"canReveal":   revealFile != nil,
 		"desktop":     putAutostart != nil, // есть ли оболочка Windows с треем

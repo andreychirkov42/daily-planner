@@ -48,6 +48,6 @@ async function quickAdd(e) {
   input.value = "";
   renderPreview();
   render();
-  if (mobile()) { closeSheets(); toast("Задача добавлена"); return; }
+  if (mobile()) { closeSheets(); return; }
   flash(created.id);
 }

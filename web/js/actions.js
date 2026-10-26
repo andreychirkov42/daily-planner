@@ -31,7 +31,7 @@ async function toggleTask(id) {
   if (next) { S.tasks.push(next); S.enter.add(next.id); }
   if (task.done) {
     chime();
-    toast(next ? `Готово! Следующий повтор: ${humanDate(next.due)}` : "Задача выполнена");
+    if (next) toast(`Следующий повтор: ${humanDate(next.due)}`);
     if (el) maybeCelebrate(el);
   }
   if (el && el.isConnected && S.selected !== id) {

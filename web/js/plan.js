@@ -72,7 +72,6 @@ async function timerToggle(id) {
     replaceTask(await api("POST", `/tasks/${id}/timer/stop`));
   } else {
     (await api("POST", `/tasks/${id}/timer/start`)).forEach(replaceTask);
-    toast(`Учёт времени: ${t.title}`);
   }
   render();
 }

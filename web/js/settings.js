@@ -13,7 +13,6 @@ async function saveSettings(patch) {
   appInfo = await api("PUT", "/settings", patch);
   S.app = { ...S.app, closeAction: appInfo.closeAction, dayEnd: appInfo.dayEnd };
   renderView();
-  toast("Сохранено");
 }
 
 function themeChoice() { return safeGet("theme") || ""; }
@@ -87,14 +86,14 @@ function viewSettings() {
       <button class="btn btn-sm" data-set-help style="margin-top:12px">Как писать задачи в строке добавления</button>
     </section>`}
 
-    <p class="set-about">Clepsy ${esc(a.version)} · <button class="link-btn" data-set-github>исходный код на GitHub</button></p>
+    <p class="set-about">Clepsy ${esc(a.version)}</p>
   </div>`;
 }
 
 // bindSettings вешает обработчики после каждой отрисовки раздела
 function bindSettings(root) {
   const box = root.querySelector("#setPomo");
-  if (box) bindPomoSettings(box, pomo.client(), () => { toast("Длительности сохранены"); renderView(); });
+  if (box) bindPomoSettings(box, pomo.client(), () => renderView());
   bindSync(root);
   root.querySelector("[data-set-autoupdate]")?.addEventListener("change", e => saveSettings({ autoUpdate: e.target.checked }));
 
@@ -117,7 +116,7 @@ function bindSettings(root) {
 
 function onSettingsClick(e) {
   if (onSyncClick(e) || onUpdateClick(e)) return true;
-  const b =e.target.closest("[data-theme-set], [data-close-set], [data-set-notify], [data-set-reveal], [data-set-help], [data-set-github]");
+  const b = e.target.closest("[data-theme-set], [data-close-set], [data-set-notify], [data-set-reveal], [data-set-help]");
   if (!b) return false;
   const d = b.dataset;
   if (d.themeSet !== undefined) {
@@ -128,11 +127,6 @@ function onSettingsClick(e) {
   else if (d.setNotify !== undefined) enableNotifications().then(renderView);
   else if (d.setReveal !== undefined) api("POST", "/app/reveal");
   else if (d.setHelp !== undefined) $("#helpModal").hidden = false;
-  else if (d.setGithub !== undefined) {
-    // в приложении Android ссылку открывает сама оболочка: серверу на телефоне браузер не запустить
-    if (window.ClepsyAndroid && appInfo) ClepsyAndroid.openUrl(appInfo.repo);
-    else api("POST", "/app/github");
-  }
   return true;
 }
 

@@ -97,7 +97,6 @@ async function runSync(manual) {
     if (res.ok) {
       syncInfo = body.sync;
       if (body.changed) await load();
-      if (manual) toast(body.changed ? "Синхронизировано, данные обновлены" : "Синхронизировано");
     } else {
       if (manual) toast(body.error || "Не удалось синхронизировать");
       await loadSync();
