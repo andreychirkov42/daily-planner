@@ -659,3 +659,102 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .switch input:checked + i::after { transform: translateX(18px); background: #fff; }
 .switch input:focus-visible + i { box-shadow: 0 0 0 3px var(--accent-soft); }
 @media (max-width: 760px) { .set-row { flex-direction: column; align-items: stretch; } .set-ctl { justify-content: flex-start; } .set-seg { min-width: 0; } }
+
+/* ---------- телефон (класс m на <html>, см. js/mobile.js) ---------- */
+.m-tabs, .m-backdrop, .m-sheet { display: none; }
+.m .sidebar, .m .burger, .m .t-actions, .m .help-grid { display: none; }
+.m .main { padding: 14px 16px 96px; }
+.m .main-head { align-items: center; gap: 6px; margin-bottom: 12px; }
+.m .main-head h1 { font-size: 27px; }
+.m .eyebrow { text-transform: none; }
+.m-kebab .i { stroke-width: 3.4; }
+.m .task:hover { transform: none; box-shadow: none; }
+.m .view { margin-top: 0; }
+.m .group:first-child { margin-top: 6px; }
+
+/* нижняя панель */
+.m .m-tabs {
+  display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  align-items: center; padding: 6px 4px 8px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+}
+.m-tabs button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; background: none; color: var(--ink-3); font-size: 11px; font-weight: 700; padding: 4px 0; }
+.m-tabs button .i { width: 22px; height: 22px; }
+.m-tabs button.on { color: var(--accent); }
+.m-tabs .m-fab { flex: none; width: 54px; height: 44px; margin: 0 6px; border-radius: 14px; justify-content: center; color: var(--accent-ink); background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 14px var(--glow); }
+.m-tabs .m-fab .i { width: 24px; height: 24px; stroke-width: 2.2; }
+
+/* шторка добавления: строка ввода над клавиатурой */
+.m .quick-add, .m .qa-preview { display: none !important; }
+.m .m-adding .quick-add { display: flex !important; position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 41; box-shadow: var(--shadow-lg); border-color: var(--accent); }
+.m .m-adding .quick-add .btn { display: inline-flex; }
+.m .m-adding .qa-preview { display: flex !important; position: fixed; left: 12px; right: 12px; bottom: 72px; z-index: 41; min-height: 0; padding: 0; }
+.m .m-adding .m-tabs { display: none; }
+
+/* затемнение и меню «⋮» */
+.m .m-backdrop:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 40; background: rgba(10, 8, 20, .45); }
+.m .m-sheet:not([hidden]) {
+  display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
+  background: var(--panel); border-radius: 18px 18px 0 0; padding: 10px 10px 16px; box-shadow: var(--shadow-lg);
+  animation: sheet-up .2s ease-out;
+}
+@keyframes sheet-up { from { transform: translateY(100%); } }
+.m-menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; border-radius: 10px; padding: 12px 10px; font-size: 15px; font-weight: 600; text-align: left; }
+.m-menu button:active { background: var(--panel-2); }
+.m-menu .i { width: 18px; height: 18px; color: var(--ink-2); }
+.m-menu .group-head { margin: 10px 10px 2px; }
+.m-mark { width: 18px; display: inline-grid; }
+.m-mark .i { color: var(--accent); }
+
+/* «План» */
+.m-seg { margin-bottom: 14px; }
+.m-seg button { padding: 8px 0; }
+.m .cal-head h2 { min-width: 0; flex: 1; font-size: 19px; margin: 0 4px; text-transform: none; }
+.m .cal-head h2::first-letter { text-transform: uppercase; }
+
+/* «Таймер»: блок Помодоро из боковой панели крупно */
+.m-timer .pomodoro { margin-top: 18px; padding: 22px 16px 24px; background: var(--panel); border: 1px solid var(--line); }
+.m-timer .pomo-modes button { font-size: 13px; padding: 6px 0; }
+.m-timer .pomo-modes button small { font-size: 11px; }
+.m-timer .pomo-clock { margin: 22px 0 6px; gap: 10px; }
+.m-timer .pomo-time { font-size: 68px; }
+.m-timer .clock-arrows button { width: 38px; height: 30px; font-size: 12px; }
+.m-timer .pomo-label { font-size: 14px; }
+.m-timer .pomo-ctrl { margin-top: 18px; gap: 10px; }
+.m-timer .pomo-ctrl .btn { padding: 11px 28px; font-size: 16px; }
+.m-timer .pomo-gear { min-width: 34px; height: 34px; }
+
+/* «Ещё» */
+.m-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--ink-3); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.m-search:focus-within { border-color: var(--accent); }
+.m-search .i { width: 18px; height: 18px; }
+.m-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 11px 0; font-size: 15px; }
+.m-group { margin-top: 12px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.m-row { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 13px 14px; font-size: 15px; font-weight: 600; text-align: left; }
+.m-row:last-child { border-bottom: 0; }
+.m-row:active { background: var(--panel-2); }
+.m-row .i { width: 19px; height: 19px; color: var(--ink-2); }
+.m-row .dot { margin: 0 4px; }
+.m-row span { flex: 1; }
+.m-row b { color: var(--ink-3); font-size: 13px; font-weight: 600; }
+.m-muted { color: var(--ink-2); }
+#mMore > .group-head { margin: 20px 4px 0; }
+#mMore > .tags-cloud { padding: 8px 0 0; }
+
+/* «Привычки»: карточка с неделей вместо широкой таблицы */
+.m-habit { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; margin-bottom: 10px; }
+.m-habit-top { display: flex; align-items: center; gap: 4px; }
+.m-habit-top b { flex: 1; }
+.m-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; }
+.m-week .hcheck { width: auto; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--ink-2); }
+.m-week .hcheck small { font-size: 10px; font-weight: 600; color: var(--ink-3); }
+.m-week .hcheck.on, .m-week .hcheck.on small { color: #fff; }
+.m-week .hcheck.today:not(.on) { border-color: var(--c); }
+.m .add-habit .input { max-width: none; flex: 1; }
+
+/* мелочи */
+.m .load { font-size: 12.5px; gap: 6px 10px; padding: 9px 12px; }
+.m .load .track { flex-basis: 100%; order: 5; min-width: 0; height: 6px; }
+.m .toast { bottom: 86px; max-width: calc(100vw - 32px); }
+.m .modal-card { max-height: calc(100vh - 32px); overflow-y: auto; }

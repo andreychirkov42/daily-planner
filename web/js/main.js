@@ -5,6 +5,7 @@
 function init() {
   hydrateIcons(); // <i data-i> в разметке → SVG
   applyTheme();
+  initMobile();
   $("#quickAdd").addEventListener("submit", quickAdd);
   $("#qaInput").addEventListener("input", renderPreview);
   // клик в любом месте строки ставит курсор в поле ввода
@@ -64,7 +65,8 @@ function init() {
   document.addEventListener("keydown", e => {
     const typing = e.target.matches("input, textarea, select");
     if (e.key === "Escape") {
-      if (!$("#helpModal").hidden) $("#helpModal").hidden = true;
+      if (!$("#mBackdrop").hidden) closeSheets();
+      else if (!$("#helpModal").hidden) $("#helpModal").hidden = true;
       else if (!$("#planModal").hidden) { $("#planModal").hidden = true; render(); }
       else if (S.selected) { S.selected = null; render(); }
       else if (typing) e.target.blur();
@@ -113,6 +115,12 @@ async function smokeTour() {
     setView(v);
     await pause();
   }
+  if (mobile()) { // телефон: месяц в «Плане», поиск во «Ещё», меню «⋮», шторка добавления
+    S.planMode = "month"; setView("plan"); await pause();
+    setView("more"); S.mQuery = "а"; fillSearch(); S.mQuery = ""; await pause();
+    setView("today"); openMenu(); await pause(); closeSheets();
+    openAdd(); await pause(); closeSheets();
+  }
   S.search = "а"; renderView(); S.search = "";
   const t = S.tasks.find(x => !x.done) || S.tasks[0];
   if (t) {
@@ -121,13 +129,15 @@ async function smokeTour() {
     safeSet("detailMore", "1"); render(); await pause();
     S.selected = null; render();
   }
-  // холст: проводим линию и сохраняем
-  setView("sketch"); await pause();
-  const ov = $(".sk-overlay"), r = ov.getBoundingClientRect();
-  const ev = (type, k) => ov.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX: r.left + r.width * k, clientY: r.top + r.height * k, button: 0 }));
-  ev("pointerdown", 0.2); ev("pointermove", 0.4); ev("pointermove", 0.6); ev("pointerup", 0.6);
-  await sketch.flush();
-    openPlan(); await pause(); $("#planModal").hidden = true;
+  // холст: проводим линию и сохраняем (на телефоне холста нет)
+  if (!mobile()) {
+    setView("sketch"); await pause();
+    const ov = $(".sk-overlay"), r = ov.getBoundingClientRect();
+    const ev = (type, k) => ov.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX: r.left + r.width * k, clientY: r.top + r.height * k, button: 0 }));
+    ev("pointerdown", 0.2); ev("pointermove", 0.4); ev("pointermove", 0.6); ev("pointerup", 0.6);
+    await sketch.flush();
+  }
+  openPlan(); await pause(); $("#planModal").hidden = true;
   $("#pomoGear").click(); await pause(); $("#pomoGear").click();
   setView("today");
 }

@@ -169,9 +169,13 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    /** «Назад»: страница сама закрывает шторку, задачу или раздел (clepsyBack); если нечего — сворачиваемся. */
     private void goBack() {
-        if (web.canGoBack()) web.goBack();
-        else moveTaskToBack(true); // не закрываем: сервер и таймер Помодоро продолжают работать
+        web.evaluateJavascript("window.clepsyBack ? clepsyBack() : false", handled -> {
+            if ("true".equals(handled)) return;
+            if (web.canGoBack()) web.goBack();
+            else moveTaskToBack(true); // не закрываем: сервер и таймер Помодоро продолжают работать
+        });
     }
 
     @Override

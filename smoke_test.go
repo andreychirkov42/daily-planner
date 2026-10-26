@@ -32,7 +32,8 @@ func TestSmokePages(t *testing.T) {
 	srv := httptest.NewServer(guard(mux))
 	defer srv.Close()
 
-	for _, page := range []string{"/?smoke=1", "/popup.html?smoke=1"} {
+	// /?smoke=1&mobile=1 — та же страница в вёрстке для телефона (нижняя панель, «План», «Таймер», «Ещё»)
+	for _, page := range []string{"/?smoke=1", "/?smoke=1&mobile=1", "/popup.html?smoke=1"} {
 		t.Run(page, func(t *testing.T) {
 			dom := dumpDOM(t, browser, srv.URL+page)
 			htmlTag := regexp.MustCompile(`(?s)<html[^>]*>`).FindString(dom)

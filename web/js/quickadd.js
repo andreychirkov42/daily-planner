@@ -6,6 +6,7 @@ function viewDefaults() {
   const v = S.view;
   if (v === "today") return { due: today() };
   if (v === "calendar" && S.calPick) return { due: S.calPick };
+  if (v === "plan") return { due: (S.planMode === "month" && S.calPick) || today() };
   if (v === "schedule") return { due: S.schedDay || today() };
   if (v.startsWith("list:")) return { listId: v.slice(5) };
   if (v.startsWith("tag:")) return { tags: [v.slice(4)] };
@@ -47,5 +48,6 @@ async function quickAdd(e) {
   input.value = "";
   renderPreview();
   render();
+  if (mobile()) { closeSheets(); toast("Задача добавлена"); return; }
   flash(created.id);
 }

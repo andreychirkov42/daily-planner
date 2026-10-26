@@ -91,7 +91,7 @@ function flash(id) {
 async function onViewClick(e) {
   const nav = e.target.closest("[data-view]");
   if (nav) { setView(nav.dataset.view); return; }
-  if (onSettingsClick(e)) return;
+  if (onSettingsClick(e) || onMobileClick(e)) return;
 
   const cal = e.target.closest("[data-cal]");
   if (cal) {
@@ -102,6 +102,7 @@ async function onViewClick(e) {
   }
   const gact = e.target.closest("[data-act]")?.dataset.act;
   if (gact === "plan") { openPlan(); return; }
+  if (gact === "menu") { openMenu(); return; }
   if (gact === "dayEnd") { askDayEnd(); renderView(); return; }
 
   const sched = e.target.closest("[data-sched]");
@@ -137,12 +138,7 @@ async function onViewClick(e) {
     S.habits = S.habits.filter(h => h.id !== hd.dataset.delHabit);
     renderView(); return;
   }
-  if (e.target.id === "clearDone") {
-    if (!confirm("Удалить все выполненные задачи навсегда?")) return;
-    const { removed } = await api("POST", "/tasks/clear-completed");
-    S.tasks = S.tasks.filter(t => !t.done);
-    render(); toast(`Удалено задач: ${removed}`); return;
-  }
+  if (e.target.id === "clearDone") return clearCompleted();
 
   const taskEl = e.target.closest(".task");
   if (!taskEl) return;
@@ -154,6 +150,13 @@ async function onViewClick(e) {
   if (act === "pin") { const t = S.tasks.find(t => t.id === id); t.pinned = !t.pinned; saveTask(t, 0); render(); return; }
   S.selected = S.selected === id ? null : id;
   render();
+}
+
+async function clearCompleted() {
+  if (!confirm("Удалить все выполненные задачи навсегда?")) return;
+  const { removed } = await api("POST", "/tasks/clear-completed");
+  S.tasks = S.tasks.filter(t => !t.done);
+  render(); toast(`Удалено задач: ${removed}`);
 }
 
 /* ================= drag & drop ================= */
@@ -255,18 +258,19 @@ function showNewList() {
   inp.addEventListener("blur", () => setTimeout(() => { if (slot.isConnected) slot.innerHTML = ""; }, 150));
 }
 
+async function deleteList(id) {
+  const l = listById(id);
+  if (!confirm(`Удалить список «${l.name}»? Задачи переедут во «Входящие».`)) return;
+  await api("DELETE", "/lists/" + l.id);
+  S.lists = S.lists.filter(x => x.id !== l.id);
+  S.tasks.forEach(t => { if (t.listId === l.id) t.listId = ""; });
+  if (S.view === "list:" + l.id) S.view = mobile() ? "more" : "inbox";
+  render();
+}
+
 async function onSidebarClick(e) {
   const del = e.target.closest("[data-del-list]");
-  if (del) {
-    e.stopPropagation();
-    const l = listById(del.dataset.delList);
-    if (!confirm(`Удалить список «${l.name}»? Задачи переедут во «Входящие».`)) return;
-    await api("DELETE", "/lists/" + l.id);
-    S.lists = S.lists.filter(x => x.id !== l.id);
-    S.tasks.forEach(t => { if (t.listId === l.id) t.listId = ""; });
-    if (S.view === "list:" + l.id) S.view = "inbox";
-    render(); return;
-  }
+  if (del) { e.stopPropagation(); return deleteList(del.dataset.delList); }
   const nav = e.target.closest("[data-view]");
   if (nav) setView(nav.dataset.view);
 }

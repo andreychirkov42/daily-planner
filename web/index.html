@@ -17,6 +17,8 @@
       addEventListener("error", e => put(e.message + " @ " + (e.filename || "").split("/").pop() + ":" + e.lineno));
       addEventListener("unhandledrejection", e => put("promise: " + (e.reason && e.reason.message || e.reason)));
     })();
+    // телефонная вёрстка — сразу, чтобы при открытии не мелькала компьютерная
+    if (matchMedia("(max-width: 760px)").matches || location.search.includes("mobile")) document.documentElement.classList.add("m");
   </script>
 </head>
 <body>
@@ -106,9 +108,20 @@
   <aside class="detail" id="detail" aria-hidden="true"></aside>
 </div>
 
+<!-- телефон: нижняя панель, затемнение и шторка меню «⋮» -->
+<nav class="m-tabs" id="mTabs">
+  <button data-tab="today"><i data-i="sun"></i><span>Сегодня</span></button>
+  <button data-tab="plan"><i data-i="calendar"></i><span>План</span></button>
+  <button data-tab="add" class="m-fab" aria-label="Новая задача"><i data-i="plus"></i></button>
+  <button data-tab="timer"><i data-i="timer"></i><span>Таймер</span></button>
+  <button data-tab="more"><i data-i="menu"></i><span>Ещё</span></button>
+</nav>
+<div class="m-backdrop" id="mBackdrop" hidden></div>
+<div class="m-sheet" id="mSheet" hidden></div>
+
 <div class="modal" id="helpModal" hidden>
   <div class="modal-card">
-    <h3>Горячие клавиши и быстрый ввод</h3>
+    <h3 id="helpTitle">Горячие клавиши и быстрый ввод</h3>
     <div class="help-grid">
       <kbd>N</kbd><span>новая задача</span>
       <kbd>/</kbd><span>поиск</span>
@@ -149,6 +162,7 @@
 <script src="js/ui.js"></script>
 <script src="js/sketch.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/mobile.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

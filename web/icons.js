@@ -8,6 +8,8 @@ const ICONS = {
   upcoming: '<rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/>',
   inbox: '<path d="M21.5 12.5h-5.5l-2 3h-4l-2-3H2.5"/><path d="M5.5 5.2 2.5 12.5v5a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2v-5l-3-7.3a2 2 0 0 0-1.8-1.2H7.3a2 2 0 0 0-1.8 1.2z"/>',
   list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  dots: '<path d="M12 5h.01M12 12h.01M12 19h.01"/>',
   board: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 7.5v8M12 7.5v4.5M16 7.5v6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
   calendar: '<rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/>',

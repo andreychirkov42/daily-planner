@@ -36,9 +36,11 @@ const TITLES = {
   today: "Сегодня", upcoming: "Предстоящие", inbox: "Входящие", all: "Все задачи", calendar: "Календарь",
   board: "Доска", schedule: "Расписание дня", sketch: "Холст", settings: "Настройки",
   matrix: "Приоритеты", habits: "Привычки", stats: "Статистика", completed: "Выполненные",
+  plan: "План", timer: "Таймер", more: "Ещё", // разделы телефона
 };
 
 function setView(v) {
+  if (mobile() && DESKTOP_ONLY.includes(v)) v = "today";
   if (S.view === "sketch" && v !== "sketch") sketch.flush(); // уходим с холста — сохраняем сразу
   S.view = v;
   S.search = "";
@@ -50,15 +52,18 @@ function setView(v) {
 
 function renderView() {
   const v = S.view;
+  const m = mobile();
+  restoreTimer(); // таймер мог быть перенесён в раздел «Таймер» — иначе он пропадёт вместе со старой разметкой
   let title = TITLES[v] || "";
   if (v.startsWith("list:")) title = listById(v.slice(5))?.name || "Список";
   if (v.startsWith("tag:")) title = "#" + v.slice(4);
   if (S.search) title = "Поиск";
   $("#viewTitle").textContent = title;
-  $("#eyebrow").textContent = greeting() + " · " + fmtLong.format(new Date());
+  $("#eyebrow").textContent = m ? shortDate() : greeting() + " · " + fmtLong.format(new Date());
   document.title = title + " · Clepsy";
 
-  const noAdd = ["habits", "stats", "completed", "matrix", "sketch", "settings"].includes(v) && !S.search;
+  // на телефоне строка добавления живёт в шторке по кнопке «+» и доступна везде
+  const noAdd = !m && ["habits", "stats", "completed", "matrix", "sketch", "settings"].includes(v) && !S.search;
   $("#quickAdd").style.display = noAdd ? "none" : "";
   $("#qaPreview").style.display = noAdd ? "none" : "";
 
@@ -87,10 +92,16 @@ function renderView() {
   else if (v === "completed") { el.innerHTML = viewCompleted(); head = `<button class="btn btn-sm btn-danger" id="clearDone">Очистить выполненные</button>`; }
   else if (v === "calendar") el.innerHTML = viewCalendar();
   else if (v === "matrix") el.innerHTML = viewMatrix();
-  else if (v === "habits") el.innerHTML = viewHabits();
+  else if (v === "habits") el.innerHTML = m ? viewHabitsMobile() : viewHabits();
   else if (v === "stats") el.innerHTML = viewStats();
+  else if (v === "plan") el.innerHTML = viewPlan();
+  else if (v === "timer") { el.innerHTML = viewTimer(); mountTimer(); }
+  else if (v === "more") { el.innerHTML = viewMore(); fillSearch(); }
 
+  // на телефоне справа в шапке только меню «⋮»: кружок прогресса и подсказки клавиш там лишние
+  if (m) head = menuButton();
   $("#headRight").innerHTML = head;
+  renderTabs();
   const sel = $("#sortSel");
   if (sel) sel.value = S.sort;
   bindDrag();
@@ -119,7 +130,7 @@ function taskHTML(t, opts = {}) {
   }
   if (t.status === "doing" && !t.done && S.view !== "board") meta.unshift(`<span class="chip soon">${icon("progress")} В работе</span>`);
   if (S.sort === "smart" && !t.done) meta.push(`<span class="chip" title="Срочность по формуле Taskwarrior">${icon("zap")} ${urgency(t)}</span>`);
-  const drag = opts.drag || (S.sort === "manual" && !t.done);
+  const drag = !mobile() && (opts.drag || (S.sort === "manual" && !t.done)); // перетаскивание — только мышью
 
   return `<div class="task p${t.priority} ${S.enter.has(t.id) ? "enter" : ""} ${t.done ? "done" : ""} ${t.timerStart ? "running" : ""} ${S.selected === t.id ? "selected" : ""}" data-id="${t.id}"
       ${drag ? 'draggable="true"' : ""} style="--list-color:${l ? l.color : "transparent"}">
@@ -151,7 +162,7 @@ function viewToday() {
   const now = a.filter(t => t.due === td);
   const done = S.tasks.filter(t => doneOn(t, td));
   let html = loadBar() + group("Просрочено", overdue, "overdue") + group("На сегодня", now) + group("Выполнено сегодня", done);
-  if (!overdue.length && !now.length) html = empty("sun", done.length ? "Всё сделано на сегодня! Отличная работа" : "Задач на сегодня нет — добавь первую строкой выше") + html;
+  if (!overdue.length && !now.length) html = empty("sun", done.length ? "Всё сделано на сегодня! Отличная работа" : "Задач на сегодня нет — " + (mobile() ? "нажми «+» внизу" : "добавь первую строкой выше")) + html;
   html += `<div class="day-note"><h3>${icon("note")} Заметка дня <span class="saved" id="noteSaved"></span></h3>
     <textarea id="dayNote" placeholder="Мысли, итоги дня, благодарности…">${esc(S.notes[td] || "")}</textarea></div>`;
   return html;
@@ -197,9 +208,9 @@ function viewGrouped(tasks, iconName, emptyText) {
   return dateBuckets(tasks).map(([t, arr, cls]) => group(t, arr, cls, { hideList })).join("");
 }
 
-function viewSearch() {
-  const res = S.tasks.filter(t => matchesSearch(t, S.search));
-  if (!res.length) return empty("search", `Ничего не найдено по запросу «${esc(S.search)}»`);
+function viewSearch(q = S.search) {
+  const res = S.tasks.filter(t => matchesSearch(t, q));
+  if (!res.length) return empty("search", `Ничего не найдено по запросу «${esc(q)}»`);
   return group("Активные", res.filter(t => !t.done)) + group("Выполненные", res.filter(t => t.done));
 }
 

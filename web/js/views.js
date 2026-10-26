@@ -94,7 +94,7 @@ function viewCalendar() {
   if (S.calPick) {
     const items = S.tasks.filter(t => t.due === S.calPick);
     html += `<div class="group"><div class="group-head">${cap(fmtLong.format(parseYmd(S.calPick)))} <span class="n">${items.length}</span></div>
-      <div class="tasks">${items.length ? sortTasks(items).map(t => taskHTML(t)).join("") : '<div class="empty" style="padding:20px">Задач нет — добавь через строку выше</div>'}</div></div>`;
+      <div class="tasks">${items.length ? sortTasks(items).map(t => taskHTML(t)).join("") : `<div class="empty" style="padding:20px">Задач нет — ${mobile() ? "нажми «+» внизу" : "добавь через строку выше"}</div>`}</div></div>`;
   }
   return html;
 }
