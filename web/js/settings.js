@@ -118,7 +118,11 @@ function onSettingsClick(e) {
   else if (d.setNotify !== undefined) enableNotifications().then(renderView);
   else if (d.setReveal !== undefined) api("POST", "/app/reveal");
   else if (d.setHelp !== undefined) $("#helpModal").hidden = false;
-  else if (d.setGithub !== undefined) api("POST", "/app/github");
+  else if (d.setGithub !== undefined) {
+    // в приложении Android ссылку открывает сама оболочка: серверу на телефоне браузер не запустить
+    if (window.ClepsyAndroid && appInfo) ClepsyAndroid.openUrl(appInfo.repo);
+    else api("POST", "/app/github");
+  }
   return true;
 }
 

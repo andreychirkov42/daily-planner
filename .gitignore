@@ -13,3 +13,12 @@ planner.log
 
 # личные заметки для Claude Code
 CLAUDE.local.md
+
+# Android: сборка и личные пути
+*.apk
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/jniLibs/
+

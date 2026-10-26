@@ -221,3 +221,31 @@ func TestGuardBlocksCrossSite(t *testing.T) {
 		}
 	}
 }
+
+func TestGuardTokenOnAndroid(t *testing.T) {
+	old := apiToken
+	apiToken = "3f9a1c"
+	defer func() { apiToken = old }()
+	h := guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	cases := []struct {
+		name, path, cookie string
+		want               int
+	}{
+		{"WebView с cookie", "/api/state", "3f9a1c", 204},
+		{"другое приложение без cookie", "/api/state", "", 403},
+		{"неверный код", "/api/state", "3f9a1d", 403},
+		{"страница без cookie", "/index.html", "", 204},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("GET", c.path, nil)
+		r.Host = "127.0.0.1:18080"
+		if c.cookie != "" {
+			r.AddCookie(&http.Cookie{Name: "clepsy", Value: c.cookie})
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != c.want {
+			t.Errorf("%s: код %d, ожидали %d", c.name, w.Code, c.want)
+		}
+	}
+}

@@ -1,4 +1,5 @@
-// genicon рисует иконку приложения: assets/icon.ico (трей и exe), assets/icon.png, web/icon.png.
+// genicon рисует иконку приложения: assets/icon.ico (трей и exe), assets/icon.png, web/icon.png
+// и значки приложения Android (android/app/src/main/res/mipmap-*).
 //
 //	go run ./tools/genicon                 иконка по умолчанию (часы одной линией на тёмно-фиолетовом)
 //	go run ./tools/genicon -variant=page   другой вариант
@@ -70,7 +71,13 @@ func main() {
 	must(os.WriteFile(filepath.Join("assets", "icon.png"), pngs[len(pngs)-1], 0o644))
 	must(os.WriteFile(filepath.Join("web", "icon.png"), pngs[len(pngs)-2], 0o644)) // 128px для страницы
 	must(os.WriteFile(filepath.Join("assets", "icon.ico"), ico(sizes, pngs), 0o644))
-	log.Printf("готово (%s): assets/icon.ico, assets/icon.png, web/icon.png", *variant)
+	// значок приложения Android во всех плотностях экрана
+	for dir, s := range map[string]int{"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192} {
+		res := filepath.Join("android", "app", "src", "main", "res", "mipmap-"+dir)
+		must(os.MkdirAll(res, 0o755))
+		must(writePNG(filepath.Join(res, "ic_launcher.png"), render(s, fn)))
+	}
+	log.Printf("готово (%s): assets/icon.ico, assets/icon.png, web/icon.png, android/.../mipmap-*/ic_launcher.png", *variant)
 }
 
 func must(err error) {

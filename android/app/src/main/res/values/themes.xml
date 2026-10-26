@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- светлая тема днём, тёмная — в values-night: по ней WebView решает prefers-color-scheme;
+         фон до загрузки страницы — как у Clepsy, чтобы не мигало -->
+    <style name="Theme.Clepsy" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorBackground">@color/bg</item>
+    </style>
+    <color name="bg">#f2f5fa</color>
+</resources>

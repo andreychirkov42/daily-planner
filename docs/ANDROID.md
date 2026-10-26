@@ -5,17 +5,28 @@
 ## Устройство приложения
 
 ```
-Clepsy.apk
-├─ MainActivity (Java)         — полноэкранный WebView на http://127.0.0.1:<порт>/
-└─ lib/arm64-v8a/libclepsy.so  — тот же Go-сервер, собранный под Android
-                                 (GOOS=android GOARCH=arm64 CGO_ENABLED=0, ~10 МБ)
+Clepsy.apk (~6.5 МБ)
+├─ MainActivity (Java, без androidx)  — WebView на http://127.0.0.1:18080/
+├─ lib/arm64-v8a/libclepsy.so          — Go-сервер для телефонов (GOOS=android GOARCH=arm64)
+└─ lib/x86_64/libclepsy.so             — Go-сервер для эмулятора (GOOS=linux GOARCH=amd64, статический)
 ```
 
-- Activity при старте запускает `libclepsy.so` из `nativeLibraryDir` (`-no-tray -no-open -data <filesDir>/data.json -addr 127.0.0.1:<порт>`), ждёт ответа сервера и открывает WebView. Вся логика (повторы, перенос, планы, Помодоро, холст) — общая с Windows, ничего не переписывается на Java/Kotlin.
-- В манифесте `extractNativeLibs="true"` (Gradle: `packaging.jniLibs.useLegacyPackaging = true`), иначе .so не распакуется и запустить его нельзя.
-- NDK и gomobile не нужны: проверено, `go build` под android/arm64 без cgo проходит.
-- Порт — случайный свободный или фиксированный (например 18080); сервер слушает только 127.0.0.1, `guard` не меняется.
-- Кнопка «Назад» → `history.back()` в WebView, на главном экране — свернуть приложение.
+Готово (шаг 1):
+- `android/` — Gradle-проект (AGP 9.4.1, Gradle 9.8.1 через wrapper, compileSdk/targetSdk 37, minSdk 26), пакет `io.github.andreychirkov42.clepsy`.
+- `MainActivity` запускает `libclepsy.so` из `nativeLibraryDir` (`-no-tray -no-open -data <filesDir>/data.json -addr 127.0.0.1:18080`), ждёт ответа и открывает WebView. Если сервер уже отвечает (окно пересоздано) — повторно не запускает. Вся логика общая с Windows.
+- Переменные окружения для сервера: `TZ` (пояс телефона; база поясов встроена тегом `timetzdata`), `TMPDIR`, `CLEPSY_TOKEN`.
+- **Защита API.** К 127.0.0.1 на телефоне может обратиться любое приложение, поэтому при заданном `CLEPSY_TOKEN` `guard` пускает к `/api/` только с cookie `clepsy=<код>`; код хранится в SharedPreferences, cookie ставит оболочка. Страницы без cookie отдаются (в них нет данных). Тест — `TestGuardTokenOnAndroid`.
+- `extractNativeLibs` (Gradle: `packaging.jniLibs.useLegacyPackaging = true`) — иначе .so не распакуется и запустить его нельзя.
+- android/amd64 без NDK не собирается («requires external linking»), поэтому для эмулятора — обычный Linux-файл. У него нет android-особенностей (DNS читает `/etc/resolv.conf`, которого нет) — для синхронизации по IP это не важно.
+- От края до края: отступы под строку состояния, жесты и клавиатуру ставятся из `WindowInsets`. Тема: `values` / `values-night` (по ним WebView отвечает на `prefers-color-scheme`), страница сообщает тему через `ClepsyAndroid.setDark(dark, bg)` — значки строки состояния светлые/тёмные.
+- `window.ClepsyAndroid.openUrl(url)` — внешние https-ссылки (кнопка GitHub в настройках); чужие ссылки в WebView тоже уходят во внешний браузер.
+- «Назад»: `history.back()` в WebView, на первой странице — свернуть приложение (сервер и Помодоро продолжают работать). Выбор файла для импорта работает (`onShowFileChooser`).
+- Значок — тот же, что у exe (`go run ./tools/genicon` пишет и `mipmap-*`), пока обычный, не адаптивный.
+
+Не сделано / потом:
+- Экспорт (`/api/export`, скачивание файла) в WebView не работает — нужен `DownloadListener`.
+- Уведомления браузера (`Notification`) в WebView недоступны — делать через Android.
+- Подпись: release подписан отладочным ключом этого ПК `C:\Users\Андрей\.android\debug.keystore`. Его нужно сохранить: без него телефон не примет обновление поверх установленной версии (только удаление с потерей данных). Позже — свой ключ.
 
 ## Синхронизация
 
@@ -49,15 +60,22 @@ Clepsy.apk
 | Эмулятор | образ `android-35/google_apis/x86_64` (Android 15, `sdk_gphone64_x86_64`), в adb — `emulator-5554` |
 | Gradle / AGP | в кэше `~\.gradle`: Gradle 9.8.1, Android Gradle Plugin 9.4.1 |
 
-Системные переменные (`JAVA_HOME`, `ANDROID_HOME`, PATH) не заданы и не нужны: пути прописываются в `build-android.ps1` и `android/local.properties` (`sdk.dir=D\:\\Android\\Sdk`, файл вне git). `cmdline-tools` (sdkmanager) не установлен — при нехватке компонентов ставить через SDK Manager в Android Studio.
+Системные переменные (`JAVA_HOME`, `ANDROID_HOME`, PATH) не заданы и не нужны: пути прописываются в `build-android.ps1` и `android/local.properties` (создаётся скриптом, вне git). `cmdline-tools` (sdkmanager) не установлен — при нехватке компонентов ставить через SDK Manager в Android Studio.
 
-Эмулятор — x86_64, телефоны — arm64, поэтому сервер собирается под оба ABI: `jniLibs/arm64-v8a/libclepsy.so` и `jniLibs/x86_64/libclepsy.so`.
+**Ловушка:** Java/Gradle падает с `Unable to establish loopback connection`, если временная папка в пути с кириллицей (`C:\Users\Андрей\AppData\Local\Temp`). Скрипт ставит `TMP`/`TEMP` = `D:\Android\tmp`.
 
-Сборка: скрипт `build-android.ps1` — `go build` под android/arm64 и android/amd64 → `android/app/src/main/jniLibs/<abi>/libclepsy.so` → `gradlew assembleRelease` → `Clepsy.apk` (подпись своим ключом, ключ вне git). Проверка — `adb install -r` на эмулятор; установка на телефон: скопировать APK и разрешить установку из этого источника, либо `adb install` по USB.
+## Сборка
+
+```powershell
+.\build-android.ps1            # gofmt, node --check, go vet (+ под android), go test → libclepsy.so ×2 → Clepsy.apk
+.\build-android.ps1 -Install   # и поставить на подключённое устройство / эмулятор через adb и запустить
+```
+
+Установленный `Clepsy.exe` скрипт не трогает. Эмулятор: `D:\Android\Sdk\emulator\emulator.exe -avd Pixel_8`. На телефон: скопировать `Clepsy.apk` и разрешить установку из этого источника, либо `adb install -r Clepsy.apk` по USB (отладка по USB в настройках разработчика).
 
 ## Порядок работы
 
-1. Каркас `android/` (Gradle-проект на Java), `build-android.ps1`; APK с текущим интерфейсом запускается на телефоне.
+1. ~~Каркас `android/` (Gradle-проект на Java), `build-android.ps1`; APK с текущим интерфейсом запускается.~~ Готово 26.10.2026, проверено на эмуляторе (Android 15).
 2. Синхронизация: `UpdatedAt` + надгробия + слияние (с тестами в `main_test.go`), слушатель на ПК, настройки на обеих сторонах.
 3. Мобильная вёрстка (после выбора макета).
 4. Потом: уведомления о сроках, виджет на главный экран.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -397,6 +398,7 @@ func settingsView(s *Store) map[string]any {
 		"closeAction": a.CloseAction,
 		"dayEnd":      a.DayEnd,
 		"version":     appVersion,
+		"repo":        repoURL,
 		"dataPath":    s.path,
 		"canReveal":   revealFile != nil,
 		"desktop":     putAutostart != nil, // есть ли оболочка Windows с треем
@@ -452,6 +454,10 @@ func httpError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+// apiToken задаёт оболочка Android: на телефоне к 127.0.0.1 могут обратиться и другие
+// приложения, поэтому API отвечает только WebView, которому выдана cookie с этим кодом.
+var apiToken = os.Getenv("CLEPSY_TOKEN")
+
 // guard не даёт чужим сайтам, открытым в браузере, менять данные через локальный API:
 // проверяем Host (защита от DNS rebinding), Origin и тип тела запроса.
 func guard(h http.Handler) http.Handler {
@@ -463,6 +469,13 @@ func guard(h http.Handler) http.Handler {
 		if host != "127.0.0.1" && host != "localhost" && host != "::1" {
 			httpError(w, http.StatusForbidden, "доступ только с этого компьютера")
 			return
+		}
+		if apiToken != "" && strings.HasPrefix(r.URL.Path, "/api/") {
+			c, err := r.Cookie("clepsy")
+			if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(apiToken)) != 1 {
+				httpError(w, http.StatusForbidden, "нет доступа")
+				return
+			}
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if o := r.Header.Get("Origin"); o != "" && o != "http://"+r.Host {

@@ -18,6 +18,8 @@
   `go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --icon assets/icon.ico --manifest gui --product-name "Clepsy" --file-description "Clepsy — задачи и планы" --product-version X.Y.Z --file-version X.Y.Z --original-filename "Clepsy.exe"` (создаёт `rsrc_windows_amd64.syso`, он в git).
 - Версия программы: константа `appVersion` в `main.go` + версия в ресурсах exe (команда выше).
 
+**Android** (ветка `mobile`): `.\build-android.ps1 [-Install]` — те же проверки, Go-сервер как `libclepsy.so` (arm64 и x86_64 для эмулятора) и `Clepsy.apk` из `android/` (Java + WebView). Устройство, ловушки и план — `docs/ANDROID.md`. При заданном `CLEPSY_TOKEN` API требует cookie `clepsy` — не убирать, иначе данные доступны любому приложению на телефоне.
+
 Флаги exe: `-addr` (по умолчанию `127.0.0.1:8080`), `-data`, `-no-open`, `-no-tray` (только сервер), `-autostart` (тихий запуск), `-popup` (сразу показать мини-панель).
 
 ## Устройство
