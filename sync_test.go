@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -148,5 +149,77 @@ func TestSyncPhoneWithPC(t *testing.T) {
 	_ = phone.SetSyncSettings(SyncSettings{Peer: srv.URL, PeerCode: "WRONG-CODE", Last: time.Now()})
 	if _, err := runSync(phone); err == nil || !strings.Contains(err.Error(), "код") {
 		t.Fatalf("с неверным кодом должна быть понятная ошибка, а не %v", err)
+	}
+}
+
+func TestPeerURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"192.168.0.10":             "http://192.168.0.10:8092/sync",
+		" http://100.64.1.2:9000/": "http://100.64.1.2:9000/sync",
+	} {
+		if got, err := peerURL(in); err != nil || got != want {
+			t.Errorf("%q: %q, %v; ожидали %q", in, got, err, want)
+		}
+	}
+	// на телефоне нет системного DNS — имя вместо IP должно давать понятную ошибку, а не «не отвечает»
+	if _, err := peerURL("my-pc.local"); err == nil || !strings.Contains(err.Error(), "IP") {
+		t.Errorf("имя хоста: %v", err)
+	}
+}
+
+// Смена адреса ПК (Wi-Fi → Tailscale) не должна заново запускать «первую синхронизацию»,
+// которая удаляет нетронутые списки — среди них могут быть пустые списки, пришедшие с ПК.
+func TestChangingPeerKeepsSyncHistory(t *testing.T) {
+	s := newTestStore(t)
+	last := time.Now().Add(-time.Hour)
+	_ = s.SetSyncSettings(SyncSettings{Peer: "192.168.0.10", PeerCode: "X", Last: last})
+	mux := http.NewServeMux()
+	registerSyncAPI(mux, s, nil)
+	r := httptest.NewRequest("PUT", "/api/sync", strings.NewReader(`{"peer":"100.64.1.2"}`))
+	mux.ServeHTTP(httptest.NewRecorder(), r)
+	if got := s.SyncSettings(); got.Peer != "100.64.1.2" || !got.Last.Equal(last) {
+		t.Fatalf("после смены адреса: %+v", got)
+	}
+}
+
+// Коды синхронизации не должны попадать в страницу и в файл резервной копии.
+func TestStateAndExportHideSyncCodes(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.SetSyncSettings(SyncSettings{Listen: true, Code: "SECR-ETXX", PeerCode: "PEER-CODE"})
+	mux := http.NewServeMux()
+	registerAPI(mux, s, NewPomodoro(s))
+	for _, path := range []string{"/api/state", "/api/export"} {
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		if body := w.Body.String(); strings.Contains(body, "SECR") || strings.Contains(body, "PEER-CODE") {
+			t.Errorf("%s отдаёт код синхронизации", path)
+		}
+	}
+}
+
+// Телефон, связанный с одним ПК, не должен сливать свои задачи с другим компьютером.
+func TestPhoneRefusesSecondPC(t *testing.T) {
+	pcA, pcB, phone := newTestStore(t), newTestStore(t), newTestStore(t)
+	for _, pc := range []*Store{pcA, pcB} {
+		_ = pc.SetSyncSettings(SyncSettings{Listen: true, Code: "AAAA-BBBB"})
+	}
+	_, _ = pcA.CreateTask(&Task{Title: "с ПК А"})
+	srvA := httptest.NewServer((&syncServer{store: pcA}).handler())
+	defer srvA.Close()
+	srvB := httptest.NewServer((&syncServer{store: pcB}).handler())
+	defer srvB.Close()
+
+	_ = phone.SetSyncSettings(SyncSettings{Peer: srvA.URL, PeerCode: "AAAA-BBBB"})
+	if _, err := runSync(phone); err != nil {
+		t.Fatal(err)
+	}
+	set := phone.SyncSettings()
+	set.Peer = srvB.URL
+	_ = phone.SetSyncSettings(set)
+	if _, err := runSync(phone); err == nil || !strings.Contains(err.Error(), "другим компьютером") {
+		t.Fatalf("ожидали отказ, получили %v", err)
+	}
+	if n := len(pcB.Snapshot().Tasks); n != 0 {
+		t.Fatalf("задачи ПК А попали на ПК Б: %d", n)
 	}
 }

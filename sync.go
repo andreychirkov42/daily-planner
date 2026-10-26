@@ -29,6 +29,8 @@ const (
 
 // SyncSettings — подключение этого устройства. Не синхронизируется: у ПК и телефона свои.
 type SyncSettings struct {
+	ID       string    `json:"id,omitempty"`       // ПК: свой идентификатор, чтобы телефон не смешал данные двух компьютеров
+	PeerID   string    `json:"peerId,omitempty"`   // телефон: идентификатор ПК, с которым уже синхронизировался
 	Listen   bool      `json:"listen,omitempty"`   // ПК: принимать синхронизацию из сети
 	Code     string    `json:"code,omitempty"`     // ПК: код, который вводят на телефоне
 	Peer     string    `json:"peer,omitempty"`     // телефон: адрес ПК
@@ -257,6 +259,16 @@ func (ss *syncServer) handle(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusForbidden, "неверный код")
 		return
 	}
+	set := ss.store.SyncSettings()
+	if set.ID == "" {
+		set.ID = newID()
+		_ = ss.store.SetSyncSettings(set)
+	}
+	// телефон уже связан с другим компьютером — не смешиваем задачи двух ПК
+	if p := r.Header.Get("X-Clepsy-Peer"); p != "" && p != set.ID {
+		httpError(w, http.StatusConflict, "другой компьютер")
+		return
+	}
 	var in Data
 	if !readJSON(w, r, &in) {
 		return
@@ -266,9 +278,10 @@ func (ss *syncServer) handle(w http.ResponseWriter, r *http.Request) {
 		respond(w, 0, nil, err)
 		return
 	}
-	set := ss.store.SyncSettings()
+	set = ss.store.SyncSettings()
 	set.Last, set.LastErr = time.Now(), ""
 	_ = ss.store.SetSyncSettings(set)
+	w.Header().Set("X-Clepsy-Id", set.ID)
 	if changed {
 		log.Printf("синхронизация с телефоном (%s): данные обновлены", r.RemoteAddr)
 	}
@@ -317,8 +330,13 @@ func peerURL(peer string) (string, error) {
 	if p == "" {
 		return "", errors.New("не указан адрес компьютера")
 	}
-	if _, _, err := net.SplitHostPort(p); err != nil {
-		p = net.JoinHostPort(p, syncPort)
+	host, _, err := net.SplitHostPort(p)
+	if err != nil {
+		host, p = p, net.JoinHostPort(p, syncPort)
+	}
+	// у сервера на телефоне нет системного DNS (на Android нет /etc/resolv.conf) — только IP
+	if net.ParseIP(host) == nil {
+		return "", errors.New("укажи IP-адрес компьютера цифрами, например 192.168.0.10")
 	}
 	return "http://" + p + "/sync", nil
 }
@@ -335,14 +353,18 @@ func runSync(s *Store) (bool, error) {
 		s.dropUntouchedLists() // первая синхронизация: не тащим на ПК пустые списки по умолчанию
 	}
 	var changed bool
+	var peerID string
 	if err == nil {
-		changed, err = exchange(s, url, set.PeerCode)
+		changed, peerID, err = exchange(s, url, set.PeerCode, set.PeerID)
 	}
 	set = s.SyncSettings()
 	if err != nil {
 		set.LastErr = err.Error()
 	} else {
 		set.Last, set.LastErr = time.Now(), ""
+		if peerID != "" {
+			set.PeerID = peerID
+		}
 	}
 	if serr := s.SetSyncSettings(set); err == nil {
 		err = serr
@@ -350,36 +372,40 @@ func runSync(s *Store) (bool, error) {
 	return changed, err
 }
 
-func exchange(s *Store, url, code string) (bool, error) {
+// exchange — один обмен с ПК; возвращает, изменились ли данные здесь, и идентификатор ПК.
+func exchange(s *Store, url, code, peerID string) (bool, string, error) {
 	snap := s.Snapshot()
 	body, err := json.Marshal(syncPart(&snap))
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+code)
+	req.Header.Set("X-Clepsy-Peer", peerID)
 	c := http.Client{Timeout: 20 * time.Second}
 	res, err := c.Do(req)
 	if err != nil {
-		return false, errors.New("компьютер не отвечает: проверь адрес, что Clepsy на ПК запущен и телефон в той же сети")
+		return false, "", errors.New("компьютер не отвечает: проверь адрес, что Clepsy на ПК запущен и телефон в той же сети")
 	}
 	defer res.Body.Close()
 	switch {
 	case res.StatusCode == http.StatusForbidden:
-		return false, errors.New("неверный код — посмотри его в настройках Clepsy на компьютере")
+		return false, "", errors.New("неверный код — посмотри его в настройках Clepsy на компьютере")
+	case res.StatusCode == http.StatusConflict:
+		return false, "", errors.New("телефон уже синхронизирован с другим компьютером — чтобы не смешать задачи, синхронизация отменена")
 	case res.StatusCode != http.StatusOK:
-		return false, fmt.Errorf("компьютер ответил ошибкой %d", res.StatusCode)
+		return false, "", fmt.Errorf("компьютер ответил ошибкой %d", res.StatusCode)
 	}
 	var merged Data
 	if err := json.NewDecoder(http.MaxBytesReader(nil, res.Body, 50<<20)).Decode(&merged); err != nil {
-		return false, errors.New("непонятный ответ компьютера")
+		return false, "", errors.New("непонятный ответ компьютера")
 	}
 	_, changed, err := s.MergeSync(merged)
-	return changed, err
+	return changed, res.Header.Get("X-Clepsy-Id"), err
 }
 
 // ---- API для интерфейса ----
@@ -415,9 +441,8 @@ func registerSyncAPI(mux *http.ServeMux, s *Store, ss *syncServer) {
 			set.Code = newSyncCode()
 		}
 		if body.Peer != nil {
-			if *body.Peer != set.Peer {
-				set.Last = time.Time{} // новый компьютер — снова первая синхронизация
-			}
+			// Last не сбрасываем: смена адреса (Wi-Fi → Tailscale) — тот же компьютер, а «первая
+			// синхронизация» удалила бы его пустые списки, пришедшие на телефон раньше
 			set.Peer = strings.TrimSpace(*body.Peer)
 		}
 		if body.PeerCode != nil {

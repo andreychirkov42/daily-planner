@@ -3,11 +3,22 @@
 // На ПК — включить приём и показать адрес с кодом; на телефоне — ввести их и синхронизироваться.
 
 let syncInfo = null; // ответ /api/sync: listen, code, addrs, port, peer, hasPeerCode, last, lastErr
-let syncBusy = false;
+let syncBusy = false, syncLoading = false;
 
 async function loadSync() {
+  if (syncLoading) return; // карточка просит данные при каждой отрисовке — не плодим запросы
+  syncLoading = true;
   try { syncInfo = await (await fetch("/api/sync")).json(); } catch { /* сервер перезапускается */ }
-  if (S.view === "settings") renderView();
+  syncLoading = false;
+  if (S.view === "settings" && syncInfo) renderView();
+}
+
+// Пока человек что-то вводит, рисует или правка ещё не ушла на сервер, данные не перезагружаем:
+// load() перерисует страницу, и правка потеряется.
+function busyEditing() {
+  return !!S.selected || Object.keys(saveTimers).length > 0 || S.view === "sketch" ||
+    !$("#planModal").hidden || !$("#mBackdrop").hidden ||
+    !!(document.activeElement && document.activeElement.matches("input, textarea, select"));
 }
 
 function syncWhen() {
@@ -96,10 +107,18 @@ async function runSync(manual) {
   if (S.view === "settings") renderView();
 }
 
-// телефон: тихая синхронизация при открытии, при возвращении в приложение и раз в 3 минуты
+// Телефон: тихая синхронизация при открытии, при возвращении в приложение и раз в 3 минуты.
+// ПК с включённым приёмом: раз в минуту подхватывает то, что прислал телефон, — иначе открытое окно
+// показывало бы старую задачу и при правке затёрло бы ею свежую версию с телефона.
 function initAutoSync() {
-  const auto = () => { if (appInfo && appInfo.phone && syncInfo && syncInfo.peer && !document.hidden) runSync(false); };
+  const auto = () => {
+    if (document.hidden || busyEditing() || !appInfo || !syncInfo) return;
+    if (appInfo.phone && syncInfo.peer) runSync(false);
+  };
   loadSync().then(auto);
   document.addEventListener("visibilitychange", auto);
   setInterval(auto, 3 * 60 * 1000);
+  setInterval(() => {
+    if (!document.hidden && !busyEditing() && appInfo && !appInfo.phone && syncInfo && syncInfo.listen) load();
+  }, 60 * 1000);
 }

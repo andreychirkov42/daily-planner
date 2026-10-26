@@ -267,7 +267,7 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 
 	// всё состояние одним запросом — фронтенду так проще
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, s.Snapshot())
+		writeJSON(w, http.StatusOK, publicSnapshot(s))
 	})
 
 	mux.HandleFunc("GET /api/tasks", func(w http.ResponseWriter, r *http.Request) {
@@ -385,7 +385,7 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 
 	mux.HandleFunc("GET /api/export", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", `attachment; filename="planner-backup-`+time.Now().Format("2006-01-02")+`.json"`)
-		writeJSON(w, http.StatusOK, s.Snapshot())
+		writeJSON(w, http.StatusOK, publicSnapshot(s))
 	})
 	mux.HandleFunc("POST /api/import", func(w http.ResponseWriter, r *http.Request) {
 		var d Data
@@ -394,6 +394,14 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 		}
 		respond(w, http.StatusNoContent, nil, s.Replace(d))
 	})
+}
+
+// publicSnapshot — данные для страницы и резервной копии: без кодов синхронизации,
+// чтобы они не уходили вместе с файлом экспорта.
+func publicSnapshot(s *Store) Data {
+	d := s.Snapshot()
+	d.Sync = nil
+	return d
 }
 
 var timeRe = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
