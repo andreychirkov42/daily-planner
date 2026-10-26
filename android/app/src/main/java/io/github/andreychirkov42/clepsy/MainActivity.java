@@ -1,8 +1,11 @@
 package io.github.andreychirkov42.clepsy;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInstaller;
+import android.provider.Settings;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -22,7 +25,12 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.window.OnBackInvokedDispatcher;
 
+import org.json.JSONObject;
+
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.SecureRandom;
@@ -39,8 +47,12 @@ public class MainActivity extends Activity {
     static final int PICK_FILE = 1;
     static final String TAG = "Clepsy";
 
+    static final long UPDATE_EVERY = 6 * 60 * 60 * 1000L;
+
     // сервер живёт, пока жив процесс приложения; при пересоздании окна запускать его заново не нужно
     private static Process server;
+    private static Updater updater; // переживает пересоздание окна, как и сервер
+    private String token;
 
     private FrameLayout root;
     private WebView web;
@@ -99,13 +111,16 @@ public class MainActivity extends Activity {
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::goBack);
         }
 
-        String token = token();
+        token = token();
         CookieManager cm = CookieManager.getInstance();
         cm.setCookie(HOME, "clepsy=" + token + "; Path=/; HttpOnly; SameSite=Strict");
         cm.flush();
+        if (updater == null) updater = new Updater(getApplicationContext(), versionName());
+        current = new java.lang.ref.WeakReference<>(this);
 
         new Thread(() -> {
             boolean ok = startServer(token);
+            if (ok) new Thread(this::autoUpdate).start(); // не задерживает открытие страницы
             runOnUiThread(() -> {
                 if (ok) web.loadUrl(HOME);
                 else web.loadDataWithBaseURL(null, "<body style='font:16px sans-serif;color:#e7edf7;padding:24px'>"
@@ -220,8 +235,117 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ---- обновление из релизов GitHub ----
+
+    private String versionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "0.0.0";
+        }
+    }
+
+    /** Включено ли автообновление — настройка хранится в данных Clepsy, спрашиваем у своего сервера. */
+    private boolean autoUpdateOn() {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(HOME + "api/settings").openConnection();
+            c.setRequestProperty("Cookie", "clepsy=" + token);
+            c.setConnectTimeout(1000);
+            try (InputStream in = c.getInputStream()) {
+                byte[] b = new byte[64 << 10];
+                int n = 0;
+                for (int r; (r = in.read(b, n, b.length - n)) > 0; ) n += r;
+                return new JSONObject(new String(b, 0, n, "UTF-8")).optBoolean("autoUpdate", true);
+            } finally {
+                c.disconnect();
+            }
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /** При запуске: раз в 6 часов проверить релизы и заранее скачать новую версию. */
+    private void autoUpdate() {
+        SharedPreferences p = getSharedPreferences("clepsy", MODE_PRIVATE);
+        long now = System.currentTimeMillis();
+        if (now - p.getLong("updateChecked", 0) < UPDATE_EVERY || !autoUpdateOn()) return;
+        p.edit().putLong("updateChecked", now).apply();
+        updater.check();
+        pushUpdate();
+    }
+
+    /** Сообщает странице состояние обновления (она покажет «Установить»). */
+    private void pushUpdate() {
+        String js = "window.clepsyUpdate && clepsyUpdate(" + updater.json() + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    /** Отдаёт скачанный APK системному установщику: Android спросит подтверждение. */
+    private void installApk() {
+        File apk = updater.apk();
+        if (!apk.exists()) return;
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            // без этого разрешения установщик не откроется — ведём в настройки один раз
+            updater.setError("ready", "Разреши Clepsy устанавливать приложения и нажми «Установить» ещё раз");
+            pushUpdate();
+            startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            return;
+        }
+        new Thread(() -> {
+            try {
+                PackageInstaller pi = getPackageManager().getPackageInstaller();
+                int id = pi.createSession(new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL));
+                try (PackageInstaller.Session s = pi.openSession(id)) {
+                    try (InputStream in = new FileInputStream(apk); OutputStream out = s.openWrite("clepsy", 0, apk.length())) {
+                        byte[] buf = new byte[64 << 10];
+                        for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+                        s.fsync(out);
+                    }
+                    // явный интент в закрытый приёмник; MUTABLE — установщик дописывает в него статус
+                    Intent status = new Intent(this, InstallReceiver.class);
+                    int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+                    s.commit(PendingIntent.getBroadcast(this, 0, status, flags).getIntentSender());
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "установка обновления", e);
+                updater.setError("ready", "не удалось начать установку");
+                pushUpdate();
+            }
+        }).start();
+    }
+
+    private static java.lang.ref.WeakReference<MainActivity> current = new java.lang.ref.WeakReference<>(null);
+
+    /** Установку отменили или она не удалась (зовёт InstallReceiver): файл на месте — можно ещё раз. */
+    static void installFailed(String err) {
+        MainActivity a = current.get();
+        if (a == null || updater == null) return;
+        updater.setError("ready", err);
+        a.pushUpdate();
+    }
+
     /** Методы, доступные странице как window.ClepsyAndroid. */
     class Bridge {
+        @JavascriptInterface
+        public String updateState() {
+            return updater.json().toString();
+        }
+
+        @JavascriptInterface
+        public void checkUpdate() {
+            new Thread(() -> {
+                updater.check();
+                getSharedPreferences("clepsy", MODE_PRIVATE).edit().putLong("updateChecked", System.currentTimeMillis()).apply();
+                pushUpdate();
+            }).start();
+            pushUpdate(); // сразу показать «Проверяю…»
+        }
+
+        @JavascriptInterface
+        public void installUpdate() {
+            runOnUiThread(MainActivity.this::installApk);
+        }
+
         @JavascriptInterface
         public void openUrl(String url) {
             runOnUiThread(() -> openExternal(Uri.parse(url)));

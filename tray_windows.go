@@ -37,6 +37,7 @@ var (
 	pSetWindowLongPtr              = user32.NewProc("SetWindowLongPtrW")
 	pSetWindowPos                  = user32.NewProc("SetWindowPos")
 	pShowWindow                    = user32.NewProc("ShowWindow")
+	pIsWindowVisible               = user32.NewProc("IsWindowVisible")
 	pSetForegroundWindow           = user32.NewProc("SetForegroundWindow")
 	pGetForegroundWindow           = user32.NewProc("GetForegroundWindow")
 	pGetWindowThreadProcessId      = user32.NewProc("GetWindowThreadProcessId")
@@ -151,6 +152,16 @@ func runApp(o appOptions) {
 		}
 		o.pomo.onFinish = func(_, _ string) { a.pop.wv.Dispatch(a.pop.showAtTray) }
 	}
+	// автообновление ставит новую версию, только когда окна закрыты, и перезапускает программу
+	quitApp = systray.Quit
+	mainWindowShown = func() bool {
+		if h := mainHwnd; h != 0 {
+			r, _, _ := pIsWindowVisible.Call(h)
+			return r != 0
+		}
+		return false
+	}
+	appBusy = func() bool { return mainWindowShown() || (a.pop != nil && a.pop.visible.Load()) }
 	systray.Register(a.onTrayReady, func() {
 		if a.pop != nil {
 			a.pop.wv.Terminate()

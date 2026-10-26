@@ -42,13 +42,13 @@ function checkDeadlines() {
 }
 
 let toastTimer;
-function toast(text, actionText, action) {
+function toast(text, actionText, action, ms) {
   const el = $("#toast");
   el.innerHTML = `<span>${esc(text)}</span>${actionText ? `<button>${esc(actionText)}</button>` : ""}`;
   el.hidden = false;
   if (actionText) el.querySelector("button").onclick = () => { el.hidden = true; action(); };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), actionText ? 5000 : 2600);
+  toastTimer = setTimeout(() => (el.hidden = true), ms || (actionText ? 5000 : 2600));
 }
 
 /* ================= тема ================= */

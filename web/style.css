@@ -768,3 +768,6 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 .sync-addrs { display: flex; flex-wrap: wrap; gap: 6px; }
 .sync-addrs code, .sync-code { background: var(--panel-2); border-radius: 8px; padding: 3px 8px; }
 .sync-code { font: 800 17px var(--font); letter-spacing: .12em; color: var(--accent); margin-right: 8px; }
+
+/* ---------- обновления ---------- */
+.upd-err { color: var(--danger); }

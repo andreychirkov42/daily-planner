@@ -684,6 +684,8 @@ func (s *Store) replanLocked(sr *Series, now time.Time) int {
 type AppSettings struct {
 	CloseAction string `json:"closeAction"` // "tray" — крестик сворачивает в трей, "quit" — закрывает программу
 	DayEnd      string `json:"dayEnd"`      // конец рабочего дня ЧЧ:ММ
+
+	NoAutoUpdate bool `json:"noAutoUpdate,omitempty"` // автообновление выключено (по умолчанию включено)
 }
 
 func (s *Store) AppSettings() AppSettings {
@@ -691,6 +693,7 @@ func (s *Store) AppSettings() AppSettings {
 	defer s.mu.RUnlock()
 	a := AppSettings{CloseAction: "tray", DayEnd: "22:00"}
 	if s.data.App != nil {
+		a.NoAutoUpdate = s.data.App.NoAutoUpdate
 		if s.data.App.CloseAction != "" {
 			a.CloseAction = s.data.App.CloseAction
 		}

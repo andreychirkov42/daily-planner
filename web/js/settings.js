@@ -70,6 +70,8 @@ function viewSettings() {
       ${st ? `<div class="set-pomo" id="setPomo">${pomoSettingsHTML(st.settings)}</div>` : `<p class="hint">Таймер ещё загружается…</p>`}
     </section>
 
+    ${updateCard(a)}
+
     <section class="set-card"><h3>${icon("archive")} Данные</h3>
       ${android ? "" : setRow("Где хранятся", `<code class="set-path">${esc(a.dataPath)}</code>`,
         a.canReveal ? `<button class="btn btn-sm" data-set-reveal>${icon("monitor")} Показать в папке</button>` : "")}
@@ -94,6 +96,7 @@ function bindSettings(root) {
   const box = root.querySelector("#setPomo");
   if (box) bindPomoSettings(box, pomo.client(), () => { toast("Длительности сохранены"); renderView(); });
   bindSync(root);
+  root.querySelector("[data-set-autoupdate]")?.addEventListener("change", e => saveSettings({ autoUpdate: e.target.checked }));
 
   root.querySelector("[data-set-dayend]")?.addEventListener("change", e => {
     if (e.target.value) saveSettings({ dayEnd: e.target.value });
@@ -113,7 +116,7 @@ function bindSettings(root) {
 }
 
 function onSettingsClick(e) {
-  if (onSyncClick(e)) return true;
+  if (onSyncClick(e) || onUpdateClick(e)) return true;
   const b =e.target.closest("[data-theme-set], [data-close-set], [data-set-notify], [data-set-reveal], [data-set-help], [data-set-github]");
   if (!b) return false;
   const d = b.dataset;

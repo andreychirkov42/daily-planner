@@ -33,11 +33,17 @@ func main() {
 	autostart := flag.Bool("autostart", false, "запуск вместе с Windows: тихо, только иконка в трее")
 	showPopup := flag.Bool("popup", false, "сразу показать мини-панель из трея")
 	syncAddr := flag.String("sync-addr", ":"+syncPort, "адрес приёма синхронизации с телефона (включается в настройках)")
+	restarted := flag.Bool("restarted", false, "перезапуск после обновления: подождать, пока старая версия освободит порт")
+	updatedFrom := flag.String("updated-from", "", "с какой версии обновились (служебный)")
 	flag.Parse()
 	setupLog(filepath.Join(filepath.Dir(*dataPath), "planner.log"))
 
 	url := "http://" + *addr
 	ln, err := net.Listen("tcp", *addr)
+	for i := 0; err != nil && *restarted && i < 40; i++ {
+		time.Sleep(500 * time.Millisecond) // старая версия ещё завершается
+		ln, err = net.Listen("tcp", *addr)
+	}
 	if err != nil {
 		// порт занят — скорее всего ежедневник уже запущен: просим его показать своё окно
 		log.Printf("порт %s занят (%v), Clepsy уже запущен", *addr, err)
@@ -54,6 +60,12 @@ func main() {
 	pomo := NewPomodoro(store)
 	syncSrv = &syncServer{store: store, addr: *syncAddr}
 	syncSrv.apply() // если в настройках включена синхронизация с телефоном
+	appUpdater = newUpdater(store, pomo, *updatedFrom)
+	// на телефоне обновлением занимается оболочка Android; `go run` (exe во временной папке) не обновляем
+	if exe, _ := os.Executable(); apiToken == "" && !strings.Contains(exe, "go-build") {
+		go cleanupOldExe()
+		go appUpdater.loop()
+	}
 	// раз в минуту переносим невыполненное (и сразу после полуночи, и при старте)
 	go func() {
 		for {
@@ -96,9 +108,17 @@ var openAppWindow func(view string) bool
 // setAppTheme красит заголовок окна под тему страницы (задаёт оболочка Windows).
 var setAppTheme func(dark bool)
 
-const (
-	appVersion = "1.2.0"
-	repoURL    = "https://github.com/andreychirkov42/daily-planner"
+// appVersion — переменная, а не константа: для проверки обновления собираем тестовые версии
+// через -ldflags "-X main.appVersion=…".
+var appVersion = "1.2.0"
+
+const repoURL = "https://github.com/andreychirkov42/daily-planner"
+
+// Для автообновления: оболочка Windows задаёт, как закрыть программу и открыто ли её окно.
+var (
+	quitApp         func()
+	mainWindowShown func() bool
+	appUpdater      *updater
 )
 
 // Возможности оболочки Windows для раздела «Настройки»; nil — на этой системе недоступно.
@@ -146,6 +166,11 @@ var syncSrv *syncServer
 func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 	registerSketchAPI(mux, s)
 	registerSyncAPI(mux, s, syncSrv)
+	u := appUpdater
+	if u == nil { // тесты
+		u = newUpdater(s, pomo, "")
+	}
+	registerUpdateAPI(mux, u)
 	mux.HandleFunc("GET /api/pomodoro", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, pomo.State())
 	})
@@ -196,6 +221,7 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 			CloseAction *string `json:"closeAction"`
 			DayEnd      *string `json:"dayEnd"`
 			Autostart   *bool   `json:"autostart"`
+			AutoUpdate  *bool   `json:"autoUpdate"`
 		}
 		if !readJSON(w, r, &body) {
 			return
@@ -214,6 +240,9 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 				return
 			}
 			a.DayEnd = *body.DayEnd
+		}
+		if body.AutoUpdate != nil {
+			a.NoAutoUpdate = !*body.AutoUpdate
 		}
 		if body.Autostart != nil {
 			if putAutostart == nil {
@@ -418,6 +447,7 @@ func settingsView(s *Store) map[string]any {
 		"canReveal":   revealFile != nil,
 		"desktop":     putAutostart != nil, // есть ли оболочка Windows с треем
 		"phone":       apiToken != "",      // запущен внутри приложения Android
+		"autoUpdate":  !a.NoAutoUpdate,
 	}
 	if getAutostart != nil {
 		v["autostart"] = getAutostart()
