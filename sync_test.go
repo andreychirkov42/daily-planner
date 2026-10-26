@@ -68,7 +68,7 @@ func TestMergeNotesAndPomos(t *testing.T) {
 		t.Error("заметка, которой нет на телефоне, должна остаться")
 	}
 	if m.Pomos["2026-10-26"] != 3 || m.Pomos["2026-10-24"] != 2 {
-		t.Errorf("помидоры — по большему: %v", m.Pomos)
+		t.Errorf("фокус-сессии — по большему: %v", m.Pomos)
 	}
 }
 

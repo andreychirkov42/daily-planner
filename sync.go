@@ -39,7 +39,7 @@ type SyncSettings struct {
 	LastErr  string    `json:"lastErr,omitempty"`
 }
 
-// syncPart — только то, что синхронизируется: задачи, списки, привычки, планы, заметки, помидоры.
+// syncPart — только то, что синхронизируется: задачи, списки, привычки, планы, заметки, фокус-сессии.
 func syncPart(d *Data) Data {
 	return Data{Tasks: d.Tasks, Lists: d.Lists, Habits: d.Habits, Series: d.Series,
 		Notes: d.Notes, NoteTimes: d.NoteTimes, Pomos: d.Pomos, Deleted: d.Deleted}
@@ -108,7 +108,7 @@ func mergeData(mine, theirs Data, now time.Time) Data {
 			}
 		}
 	}
-	// помидоры только прибавляются — берём большее
+	// фокус-сессии только прибавляются — берём большее
 	for _, d := range []Data{mine, theirs} {
 		for date, n := range d.Pomos {
 			out.Pomos[date] = max(out.Pomos[date], n)

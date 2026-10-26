@@ -1,5 +1,5 @@
 "use strict";
-// Раздел «Настройки»: тема, автозапуск, поведение крестика, уведомления, рабочий день, Помодоро, данные.
+// Раздел «Настройки»: тема, автозапуск, поведение крестика, уведомления, рабочий день, таймер, данные.
 
 let appInfo = null; // ответ /api/settings: closeAction, dayEnd, autostart, version, dataPath…
 
@@ -65,7 +65,7 @@ function viewSettings() {
         `<input class="input set-time" type="time" data-set-dayend value="${esc(a.dayEnd)}">`)}
     </section>
 
-    <section class="set-card"><h3>${icon("timer")} Помодоро</h3>
+    <section class="set-card"><h3>${icon("timer")} Таймер</h3>
       ${st ? `<div class="set-pomo" id="setPomo">${pomoSettingsHTML(st.settings)}</div>` : `<p class="hint">Таймер ещё загружается…</p>`}
     </section>
 

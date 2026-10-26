@@ -168,7 +168,7 @@ function viewStats() {
     ["За неделю", weekTotal, `в среднем ${(weekTotal / 7).toFixed(1)} в день`],
     ["Активных", a.length, `${a.filter(isOverdue).length} просрочено`],
     ["Серия", st, "дней подряд с выполненными задачами"],
-    ["Помидоры", pomos, "фокус-сессий сегодня"],
+    ["Фокус-сессии", pomos, "завершено сегодня"],
     ["Завершено", all ? Math.round(S.tasks.filter(t => t.done).length / all * 100) + "%" : "—", "от всех задач"],
   ];
 
