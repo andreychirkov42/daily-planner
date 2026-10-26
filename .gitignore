@@ -10,3 +10,6 @@ planner.log
 
 # локальные настройки
 .claude/
+
+# личные заметки для Claude Code
+CLAUDE.local.md
