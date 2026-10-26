@@ -21,6 +21,7 @@ const pomo = (() => {
     S.pomos[today()] = st.count;
   }
   return {
+    client: () => c,
     init() {
       c = pomoClient(draw, finished);
       $("#pomoStart").onclick = () => c.toggle();

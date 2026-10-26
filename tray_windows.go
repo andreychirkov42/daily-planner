@@ -125,6 +125,14 @@ func runApp(o appOptions) {
 	}
 
 	repairAutostart()
+	appStore = o.store
+	getAutostart = autostartEnabled
+	putAutostart = func(on bool) error {
+		err := setAutostart(on)
+		syncAutostartMenu()
+		return err
+	}
+	revealFile = func(path string) { _ = exec.Command("explorer", "/select,", path).Start() }
 	// фон WebView2 до загрузки страницы — без белой вспышки при открытии окна (ARGB)
 	if os.Getenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR") == "" {
 		os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0D121B")
@@ -368,7 +376,12 @@ var (
 // mainWndProc прячет окно по крестику вместо закрытия: иначе завершилась бы вся программа.
 func mainWndProc(hwnd, msg, wp, lp uintptr) uintptr {
 	if msg == wmClose && hwnd == mainHwnd {
-		pShowWindow.Call(hwnd, swHide)
+		// по настройке: свернуть в трей (по умолчанию) или закрыть программу целиком
+		if appStore != nil && appStore.AppSettings().CloseAction == "quit" {
+			go systray.Quit()
+		} else {
+			pShowWindow.Call(hwnd, swHide)
+		}
 		return 0
 	}
 	// Двойной клик по значку в заголовке Windows по умолчанию закрывает окно;
@@ -442,6 +455,23 @@ func applyTitleBar(hwnd uintptr, dark bool) {
 	set(dwmBorderColor, border)
 }
 
+var (
+	appStore *Store            // для поведения крестика окна
+	trayAuto *systray.MenuItem // пункт «Запускать вместе с Windows» в меню трея
+)
+
+// syncAutostartMenu ставит галочку в меню трея по фактическому состоянию автозапуска.
+func syncAutostartMenu() {
+	if trayAuto == nil {
+		return
+	}
+	if autostartEnabled() {
+		trayAuto.Check()
+	} else {
+		trayAuto.Uncheck()
+	}
+}
+
 // setWindowIcon ставит окну иконку из ресурсов exe (заголовок и панель задач).
 func setWindowIcon(hwnd uintptr) {
 	exe, err := os.Executable()
@@ -472,6 +502,7 @@ func (a *app) onTrayReady() {
 	mOpen := systray.AddMenuItem("Открыть Clepsy", "Окно программы")
 	mBrowser := systray.AddMenuItem("Открыть в браузере", "")
 	mAuto := systray.AddMenuItemCheckbox("Запускать вместе с Windows", "", autostartEnabled())
+	trayAuto = mAuto
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Выход", "Закрыть программу")
 
@@ -487,13 +518,8 @@ func (a *app) onTrayReady() {
 			case <-mAuto.ClickedCh:
 				if err := setAutostart(!mAuto.Checked()); err != nil {
 					log.Printf("автозапуск: %v", err)
-					continue
 				}
-				if autostartEnabled() {
-					mAuto.Check()
-				} else {
-					mAuto.Uncheck()
-				}
+				syncAutostartMenu()
 			case <-mQuit.ClickedCh:
 				systray.Quit()
 				return

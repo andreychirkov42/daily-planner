@@ -86,6 +86,7 @@ type Data struct {
 	Series   []*Series         `json:"series"`
 	Pomo     *PomoSettings     `json:"pomoSettings,omitempty"`
 	Sketches []*Sketch         `json:"sketches"`
+	App      *AppSettings      `json:"app,omitempty"`
 }
 
 type Store struct {
@@ -617,6 +618,36 @@ func (s *Store) replanLocked(sr *Series, now time.Time) int {
 		free--
 	}
 	return changed
+}
+
+// ---- настройки программы ----
+
+// AppSettings — общие для окна программы и браузера настройки.
+type AppSettings struct {
+	CloseAction string `json:"closeAction"` // "tray" — крестик сворачивает в трей, "quit" — закрывает программу
+	DayEnd      string `json:"dayEnd"`      // конец рабочего дня ЧЧ:ММ
+}
+
+func (s *Store) AppSettings() AppSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	a := AppSettings{CloseAction: "tray", DayEnd: "22:00"}
+	if s.data.App != nil {
+		if s.data.App.CloseAction != "" {
+			a.CloseAction = s.data.App.CloseAction
+		}
+		if s.data.App.DayEnd != "" {
+			a.DayEnd = s.data.App.DayEnd
+		}
+	}
+	return a
+}
+
+func (s *Store) SetAppSettings(a AppSettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data.App = &a
+	return s.saveLocked()
 }
 
 // ---- помодоро ----

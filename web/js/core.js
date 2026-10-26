@@ -81,7 +81,7 @@ function fmtClock(sec) {
 function spentNow(t) {
   return (t.spent || 0) + (t.timerStart ? Math.max(0, (Date.now() - new Date(t.timerStart)) / 1000) : 0);
 }
-function dayEnd() { return safeGet("dayEnd") || "22:00"; }
+function dayEnd() { return (S.app && S.app.dayEnd) || "22:00"; }
 
 // загрузка дня: сколько осталось по оценкам и сколько свободного времени до конца дня
 function dayLoad() {
@@ -146,6 +146,7 @@ async function load() {
   S.lists = d.lists || [];
   S.habits = d.habits || [];
   S.notes = d.notes || {};
+  S.app = d.app || {};
   S.series = d.series || [];
   S.pomos = d.pomos || {};
   if (!S.loaded) S.tasks.forEach(t => S.enter.add(t.id)); // анимация появления только при первой загрузке

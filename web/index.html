@@ -46,6 +46,8 @@
       <button data-view="habits"><span class="ico"><i data-i="flame"></i></span>Привычки</button>
       <button data-view="stats"><span class="ico"><i data-i="chart"></i></span>Статистика</button>
       <button data-view="completed"><span class="ico"><i data-i="done"></i></span>Выполненные</button>
+      <div class="nav-sep"></div>
+      <button data-view="settings"><span class="ico"><i data-i="settings"></i></span>Настройки</button>
     </nav>
 
     <div class="side-head">
@@ -79,13 +81,6 @@
       <div id="pomoSettings" hidden></div>
     </div>
 
-    <div class="side-foot">
-      <button class="icon-btn" id="themeBtn" title="Тема"><i data-i="theme"></i></button>
-      <button class="icon-btn" id="notifyBtn" title="Напоминания о дедлайнах"><i data-i="bell"></i></button>
-      <a class="icon-btn" href="/api/export" title="Экспорт в JSON"><i data-i="download"></i></a>
-      <label class="icon-btn" title="Импорт из JSON"><i data-i="upload"></i><input type="file" id="importFile" accept="application/json" hidden></label>
-      <button class="icon-btn" id="helpBtn" title="Горячие клавиши"><i data-i="keyboard"></i></button>
-    </div>
   </aside>
 
   <main class="main">
@@ -153,6 +148,7 @@
 <script src="js/pomodoro.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/sketch.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

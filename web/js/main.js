@@ -57,27 +57,9 @@ function init() {
   detail.addEventListener("keydown", onDetailKey);
   detail.addEventListener("toggle", e => { if (e.target.matches("[data-more]")) safeSet("detailMore", e.target.open ? "1" : "0"); }, true);
 
-  $("#themeBtn").onclick = toggleTheme;
   $("#burger").onclick = () => $("#sidebar").classList.toggle("open");
-  $("#helpBtn").onclick = () => ($("#helpModal").hidden = false);
   $("#helpModal").addEventListener("click", e => { if (e.target.id === "helpModal" || e.target.dataset.close !== undefined) $("#helpModal").hidden = true; });
-  $("#notifyBtn").onclick = async () => {
-    if (!("Notification" in window)) return toast("Браузер не поддерживает уведомления");
-    const p = await Notification.requestPermission();
-    toast(p === "granted" ? "Напоминания о дедлайнах включены" : "Уведомления запрещены в браузере");
-  };
-  $("#importFile").addEventListener("change", async e => {
-    const f = e.target.files[0];
-    if (!f) return;
-    try {
-      const data = JSON.parse(await f.text());
-      if (!confirm("Заменить все текущие данные данными из файла?")) return;
-      await api("POST", "/import", data);
-      await load();
-      toast("Данные импортированы");
-    } catch { toast("Не удалось прочитать файл"); }
-    e.target.value = "";
-  });
+  loadSettings(); // настройки программы (конец дня, крестик, автозапуск)
 
   document.addEventListener("keydown", e => {
     const typing = e.target.matches("input, textarea, select");

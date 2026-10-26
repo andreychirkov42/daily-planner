@@ -92,6 +92,18 @@ var openAppWindow func(view string) bool
 // setAppTheme красит заголовок окна под тему страницы (задаёт оболочка Windows).
 var setAppTheme func(dark bool)
 
+const (
+	appVersion = "1.1.1"
+	repoURL    = "https://github.com/andreychirkov42/daily-planner"
+)
+
+// Возможности оболочки Windows для раздела «Настройки»; nil — на этой системе недоступно.
+var (
+	getAutostart func() bool
+	putAutostart func(on bool) error
+	revealFile   func(path string)
+)
+
 // askRunningToOpen просит уже запущенную копию показать окно вместо новой вкладки.
 func askRunningToOpen(url string) bool {
 	c := http.Client{Timeout: 2 * time.Second}
@@ -167,6 +179,61 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 		}
 		res, err := s.CreateSeries(&sr)
 		respond(w, http.StatusOK, res, err)
+	})
+	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, settingsView(s))
+	})
+	mux.HandleFunc("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			CloseAction *string `json:"closeAction"`
+			DayEnd      *string `json:"dayEnd"`
+			Autostart   *bool   `json:"autostart"`
+		}
+		if !readJSON(w, r, &body) {
+			return
+		}
+		a := s.AppSettings()
+		if body.CloseAction != nil {
+			if *body.CloseAction != "tray" && *body.CloseAction != "quit" {
+				httpError(w, http.StatusBadRequest, "closeAction: tray или quit")
+				return
+			}
+			a.CloseAction = *body.CloseAction
+		}
+		if body.DayEnd != nil {
+			if !timeRe.MatchString(*body.DayEnd) {
+				httpError(w, http.StatusBadRequest, "конец дня в формате ЧЧ:ММ")
+				return
+			}
+			a.DayEnd = *body.DayEnd
+		}
+		if body.Autostart != nil {
+			if putAutostart == nil {
+				httpError(w, http.StatusBadRequest, "автозапуск доступен только в Windows")
+				return
+			}
+			if err := putAutostart(*body.Autostart); err != nil {
+				httpError(w, http.StatusInternalServerError, "автозапуск: "+err.Error())
+				return
+			}
+		}
+		if err := s.SetAppSettings(a); err != nil {
+			respond(w, 0, nil, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, settingsView(s))
+	})
+	mux.HandleFunc("POST /api/app/reveal", func(w http.ResponseWriter, r *http.Request) {
+		if revealFile == nil {
+			httpError(w, http.StatusNotFound, "недоступно")
+			return
+		}
+		revealFile(s.path)
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /api/app/github", func(w http.ResponseWriter, r *http.Request) {
+		openBrowser(repoURL) // только этот адрес — чтобы API не открывал произвольные ссылки
+		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("POST /api/app/theme", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Dark bool }
@@ -319,6 +386,25 @@ func registerAPI(mux *http.ServeMux, s *Store, pomo *Pomodoro) {
 		}
 		respond(w, http.StatusNoContent, nil, s.Replace(d))
 	})
+}
+
+var timeRe = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
+
+// settingsView — всё, что показывает раздел «Настройки».
+func settingsView(s *Store) map[string]any {
+	a := s.AppSettings()
+	v := map[string]any{
+		"closeAction": a.CloseAction,
+		"dayEnd":      a.DayEnd,
+		"version":     appVersion,
+		"dataPath":    s.path,
+		"canReveal":   revealFile != nil,
+		"desktop":     putAutostart != nil, // есть ли оболочка Windows с треем
+	}
+	if getAutostart != nil {
+		v["autostart"] = getAutostart()
+	}
+	return v
 }
 
 func validTask(w http.ResponseWriter, t *Task) bool {

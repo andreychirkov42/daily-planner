@@ -91,6 +91,7 @@ function flash(id) {
 async function onViewClick(e) {
   const nav = e.target.closest("[data-view]");
   if (nav) { setView(nav.dataset.view); return; }
+  if (onSettingsClick(e)) return;
 
   const cal = e.target.closest("[data-cal]");
   if (cal) {

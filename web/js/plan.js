@@ -52,7 +52,11 @@ function onPlanChange(e) {
 
 function askDayEnd() {
   const v = prompt("Во сколько заканчивается твой день? (ЧЧ:ММ)", dayEnd());
-  if (v && /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim())) safeSet("dayEnd", v.trim().padStart(5, "0"));
+  if (v && /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim())) {
+    const t = v.trim().padStart(5, "0");
+    S.app = { ...S.app, dayEnd: t }; // сразу в интерфейсе, сохраняем в общих настройках
+    api("PUT", "/settings", { dayEnd: t });
+  }
 }
 
 /* ================= таймер задачи ================= */

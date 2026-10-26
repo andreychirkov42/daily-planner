@@ -34,7 +34,7 @@ function renderNav() {
 
 const TITLES = {
   today: "Сегодня", upcoming: "Предстоящие", inbox: "Входящие", all: "Все задачи", calendar: "Календарь",
-  board: "Доска", schedule: "Расписание дня", sketch: "Холст",
+  board: "Доска", schedule: "Расписание дня", sketch: "Холст", settings: "Настройки",
   matrix: "Приоритеты", habits: "Привычки", stats: "Статистика", completed: "Выполненные",
 };
 
@@ -58,11 +58,11 @@ function renderView() {
   $("#eyebrow").textContent = greeting() + " · " + fmtLong.format(new Date());
   document.title = title + " · Clepsy";
 
-  const noAdd = ["habits", "stats", "completed", "matrix", "sketch"].includes(v) && !S.search;
+  const noAdd = ["habits", "stats", "completed", "matrix", "sketch", "settings"].includes(v) && !S.search;
   $("#quickAdd").style.display = noAdd ? "none" : "";
   $("#qaPreview").style.display = noAdd ? "none" : "";
 
-  const showSort = !["calendar", "habits", "stats", "matrix", "completed", "schedule", "sketch"].includes(v) || S.search;
+  const showSort = !["calendar", "habits", "stats", "matrix", "completed", "schedule", "sketch", "settings"].includes(v) || S.search;
   let head = showSort ? `<select class="input btn-sm" id="sortSel" style="width:auto" title="Сортировка">
       <option value="manual">Вручную</option><option value="smart">Умная (срочность)</option>
       <option value="priority">По приоритету</option><option value="due">По сроку</option>
@@ -78,6 +78,7 @@ function renderView() {
   }
   else if (v === "schedule") el.innerHTML = viewSchedule();
   else if (v === "sketch") { el.innerHTML = ""; sketch.mount(el); }
+  else if (v === "settings") { el.innerHTML = viewSettings(); bindSettings(el); }
   else if (v === "upcoming") el.innerHTML = viewUpcoming();
   else if (v === "inbox") el.innerHTML = viewGrouped(active().filter(t => !t.listId), "inbox", "Входящие пусты — всё разобрано");
   else if (v === "all") el.innerHTML = viewGrouped(active(), "list", "Нет активных задач");
