@@ -1,0 +1,2 @@
+# Go-файлы всегда с LF: gofmt считает CRLF неотформатированным, а git на Windows подставляет CRLF при checkout
+*.go text eol=lf

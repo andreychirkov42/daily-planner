@@ -19,8 +19,8 @@ android {
         applicationId = "io.github.andreychirkov42.clepsy"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.2.0-beta.1"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     signingConfigs {
