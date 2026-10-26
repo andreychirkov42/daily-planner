@@ -111,7 +111,7 @@ var setAppTheme func(dark bool)
 
 // appVersion — переменная, а не константа: для проверки обновления собираем тестовые версии
 // через -ldflags "-X main.appVersion=…".
-var appVersion = "1.2.0"
+var appVersion = "1.3.0"
 
 const repoURL = "https://github.com/andreychirkov42/daily-planner"
 
