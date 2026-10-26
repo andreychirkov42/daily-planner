@@ -39,22 +39,25 @@ Clepsy.apk
 
 Текущая вёрстка рассчитана на окно ПК. Нужна мобильная: нижняя навигация, крупные касания, панель задачи — на весь экран, быстрый ввод снизу. **Сначала показать макет, применять после выбора.**
 
-## Инструменты для сборки APK (на этом ПК их пока нет)
+## Инструменты (уже установлены через Android Studio)
 
-| Что | Откуда | Размер |
-|---|---|---|
-| JDK 17 (Temurin, zip) | adoptium.net | ~190 МБ |
-| Android command-line tools | dl.google.com (`commandlinetools-win-*_latest.zip`) | ~150 МБ |
-| platform-tools, platforms;android-35, build-tools;35.0.0 | через `sdkmanager` | ~150 МБ |
-| Gradle (wrapper) + Android Gradle Plugin | services.gradle.org, maven.google.com | ~350 МБ при первой сборке |
+| Что | Где |
+|---|---|
+| Android Studio | `D:\Android\Android Studio` |
+| JDK (JetBrains Runtime 25) | `D:\Android\Android Studio\jbr` — для Gradle `JAVA_HOME` |
+| Android SDK | `D:\Android\Sdk`: platforms `android-37.0`, build-tools `36.0.0`, platform-tools (adb), emulator |
+| Эмулятор | образ `android-35/google_apis/x86_64` (Android 15, `sdk_gphone64_x86_64`), в adb — `emulator-5554` |
+| Gradle / AGP | в кэше `~\.gradle`: Gradle 9.8.1, Android Gradle Plugin 9.4.1 |
 
-Всё ставится в одну папку (например `D:\Android\`) без прав администратора и без изменения системных переменных — пути задаются в скрипте сборки и `local.properties`.
+Системные переменные (`JAVA_HOME`, `ANDROID_HOME`, PATH) не заданы и не нужны: пути прописываются в `build-android.ps1` и `android/local.properties` (`sdk.dir=D\:\\Android\\Sdk`, файл вне git). `cmdline-tools` (sdkmanager) не установлен — при нехватке компонентов ставить через SDK Manager в Android Studio.
 
-Сборка: скрипт `build-android.ps1` — `go build` под android/arm64 → `android/app/src/main/jniLibs/arm64-v8a/libclepsy.so` → `gradlew assembleRelease` → `Clepsy.apk` (подпись своим ключом, ключ вне git). Установка на телефон: скопировать APK и разрешить установку из этого источника, либо `adb install` по USB.
+Эмулятор — x86_64, телефоны — arm64, поэтому сервер собирается под оба ABI: `jniLibs/arm64-v8a/libclepsy.so` и `jniLibs/x86_64/libclepsy.so`.
+
+Сборка: скрипт `build-android.ps1` — `go build` под android/arm64 и android/amd64 → `android/app/src/main/jniLibs/<abi>/libclepsy.so` → `gradlew assembleRelease` → `Clepsy.apk` (подпись своим ключом, ключ вне git). Проверка — `adb install -r` на эмулятор; установка на телефон: скопировать APK и разрешить установку из этого источника, либо `adb install` по USB.
 
 ## Порядок работы
 
-1. Поставить инструменты, каркас `android/` (Gradle-проект на Java), `build-android.ps1`; APK с текущим интерфейсом запускается на телефоне.
+1. Каркас `android/` (Gradle-проект на Java), `build-android.ps1`; APK с текущим интерфейсом запускается на телефоне.
 2. Синхронизация: `UpdatedAt` + надгробия + слияние (с тестами в `main_test.go`), слушатель на ПК, настройки на обеих сторонах.
 3. Мобильная вёрстка (после выбора макета).
 4. Потом: уведомления о сроках, виджет на главный экран.
