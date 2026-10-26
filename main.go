@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -532,9 +533,17 @@ func guard(h http.Handler) http.Handler {
 	})
 }
 
+// lastEdit — когда в последний раз что-то меняли через API (из окна, мини-панели или вкладки браузера);
+// автообновление не перезапускает программу, пока ею пользуются.
+var lastEdit atomic.Int64
+
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		if r.Method != http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/") &&
+			!strings.HasPrefix(r.URL.Path, "/api/update") && r.URL.Path != "/api/app/theme" {
+			lastEdit.Store(start.UnixNano())
+		}
 		h.ServeHTTP(w, r)
 		if len(r.URL.Path) > 4 && r.URL.Path[:5] == "/api/" {
 			log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start).Round(time.Microsecond))

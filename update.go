@@ -285,9 +285,16 @@ func (u *updater) install() error {
 
 func (u *updater) autoOn() bool { return !u.store.AppSettings().NoAutoUpdate }
 
-// idle — программой сейчас не пользуются: окна закрыты и таймер не идёт.
+// idleAfter — сколько ничего не меняли, чтобы считать, что программой не пользуются
+// (окно может быть закрыто, а Clepsy открыт во вкладке браузера).
+const idleAfter = 15 * time.Minute
+
+// idle — программой сейчас не пользуются: окна закрыты, таймер не идёт и давно ничего не меняли.
 func (u *updater) idle() bool {
 	if u.pomo != nil && u.pomo.State().Running {
+		return false
+	}
+	if time.Since(time.Unix(0, lastEdit.Load())) < idleAfter {
 		return false
 	}
 	return appBusy == nil || !appBusy()

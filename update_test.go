@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewerVersion(t *testing.T) {
@@ -115,5 +116,20 @@ func TestUpdaterCheck(t *testing.T) {
 	}
 	if !u.autoOn() {
 		t.Fatal("автообновление по умолчанию включено")
+	}
+}
+
+// Пока через API что-то меняют (окно закрыто, но Clepsy открыт во вкладке браузера) — не перезапускаться.
+func TestIdleWaitsForRecentEdits(t *testing.T) {
+	u := newUpdater(newTestStore(t), nil, "")
+	old := lastEdit.Load()
+	t.Cleanup(func() { lastEdit.Store(old) })
+	lastEdit.Store(time.Now().UnixNano())
+	if u.idle() {
+		t.Fatal("только что правили задачу — программа занята")
+	}
+	lastEdit.Store(time.Now().Add(-idleAfter - time.Minute).UnixNano())
+	if !u.idle() {
+		t.Fatal("давно ничего не меняли и окон нет — можно обновляться")
 	}
 }

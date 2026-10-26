@@ -20,7 +20,7 @@ async function loadUpdate() {
 function onUpdateInfo() {
   const u = updateInfo;
   if (!u) return;
-  if (S.view === "settings") renderView();
+  if (S.view === "settings" && !busyEditing()) renderView(); // не сбивать ввод в полях настроек
   if (u.updatedFrom && safeGet("updatedNotice") !== u.current) {
     // только что обновились: описание изменений придёт с первой проверкой — ждём её немного
     if (u.latest !== u.current && updatedRetries++ < 6) { setTimeout(loadUpdate, 5000); return; }
