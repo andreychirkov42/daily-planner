@@ -10,9 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -554,9 +552,8 @@ func trayTooltip(s *Store, pomo *Pomodoro) string {
 }
 
 // ---- автозапуск ----
-// Два независимых способа, чтобы запуск при входе в Windows не зависел от одного механизма:
-// запись в реестре Run и ярлык в папке «Автозагрузка». Если сработают оба, вторая копия
-// увидит занятый порт и тихо закроется (флаг -autostart).
+// Одна запись в реестре Run (как у Steam и Discord) с флагом «включено» в StartupApproved.
+// Ярлык в «Автозагрузке» через скрытый PowerShell убран: Защитник Windows принимал это за троян.
 
 const (
 	runKey        = `Software\Microsoft\Windows\CurrentVersion\Run`
@@ -578,16 +575,12 @@ func autostartPresent() bool {
 	return regString(runKey, autostartName) != "" || regString(runKey, legacyName) != ""
 }
 
-// autostartEnabled: запись в Run есть, и ни её, ни ярлык не выключили в «Автозагрузке» диспетчера задач.
+// autostartEnabled: запись в Run есть и её не выключили в «Автозагрузке» диспетчера задач.
 func autostartEnabled() bool {
 	return autostartPresent() &&
 		!disabledInTaskManager(approvedRun, autostartName) &&
-		!disabledInTaskManager(approvedRun, legacyName) &&
-		!disabledInTaskManager(approvedLinks, startupLink)
+		!disabledInTaskManager(approvedRun, legacyName)
 }
-
-// «выключено» для StartupApproved
-var approvedOff = []byte{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 func disabledInTaskManager(key, name string) bool {
 	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE)
@@ -630,13 +623,10 @@ func setRegValue(key, name string, value any) error {
 }
 
 func setAutostart(on bool) error {
-	// старое имя записи убираем в любом случае
-	_ = setRegValue(runKey, legacyName, nil)
-	_ = setRegValue(approvedRun, legacyName, nil)
+	// старое имя записи и ярлык из версии 1.1.1 убираем в любом случае
+	removeLegacyAutostart()
 	if !on {
 		_ = setRegValue(approvedRun, autostartName, nil)
-		_ = setRegValue(approvedLinks, startupLink, nil)
-		_ = os.Remove(startupLinkPath())
 		return setRegValue(runKey, autostartName, nil)
 	}
 	exe, err := os.Executable()
@@ -646,52 +636,37 @@ func setAutostart(on bool) error {
 	if err := setRegValue(runKey, autostartName, `"`+exe+`" -autostart`); err != nil {
 		return err
 	}
-	if err := setRegValue(approvedRun, autostartName, approvedOn); err != nil {
-		return err
-	}
-	if err := writeStartupLink(exe); err != nil {
-		log.Printf("ярлык автозагрузки: %v", err) // запись в Run уже есть — не критично
-		return nil
-	}
-	return setRegValue(approvedLinks, startupLink, approvedOn)
+	// без явного «включено» в StartupApproved Windows 11 может пропустить новую запись в Run
+	return setRegValue(approvedRun, autostartName, approvedOn)
 }
 
-// writeStartupLink создаёт ярлык в «Автозагрузке» через WScript.Shell (без окна консоли).
-func writeStartupLink(exe string) error {
-	ps := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s');$s.TargetPath='%s';$s.Arguments='-autostart';$s.WorkingDirectory='%s';$s.Description='Clepsy';$s.Save()`,
-		psQuote(startupLinkPath()), psQuote(exe), psQuote(filepath.Dir(exe)))
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-	return nil
+// removeLegacyAutostart удаляет то, что оставили прошлые версии: запись DailyPlanner и ярлык
+// в «Автозагрузке» (его создание через скрытый PowerShell антивирус принимал за троян).
+func removeLegacyAutostart() {
+	_ = setRegValue(runKey, legacyName, nil)
+	_ = setRegValue(approvedRun, legacyName, nil)
+	_ = setRegValue(approvedLinks, startupLink, nil)
+	_ = os.Remove(startupLinkPath())
 }
 
-func psQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
-
-// repairAutostart при каждом старте: переносит старую запись на новое имя, чинит путь,
-// если exe перенесли, и восстанавливает ярлык. Выключенный пользователем автозапуск не трогает.
+// repairAutostart при каждом старте: переносит старую запись на новое имя и чинит путь,
+// если exe перенесли. Выключенный пользователем автозапуск не трогает.
 func repairAutostart() {
-	if !autostartEnabled() {
-		if autostartPresent() {
-			// одну из двух записей выключили в диспетчере задач — выключаем и вторую,
-			// иначе программа всё равно запустится через неё
-			_ = setRegValue(approvedRun, autostartName, approvedOff)
-			if _, err := os.Stat(startupLinkPath()); err == nil {
-				_ = setRegValue(approvedLinks, startupLink, approvedOff)
-			}
+	if _, err := os.Stat(startupLinkPath()); err == nil || regString(runKey, legacyName) != "" {
+		wasOn := autostartEnabled()
+		removeLegacyAutostart()
+		if wasOn {
+			_ = setAutostart(true)
 		}
+	}
+	if !autostartEnabled() {
 		return
 	}
 	exe, _ := os.Executable()
-	want := `"` + exe + `" -autostart`
-	_, linkErr := os.Stat(startupLinkPath())
-	if regString(runKey, autostartName) == want && regString(runKey, legacyName) == "" && linkErr == nil {
-		return // всё уже на месте — не запускаем PowerShell зря
-	}
-	if err := setAutostart(true); err != nil {
-		log.Printf("автозапуск: %v", err)
+	if regString(runKey, autostartName) != `"`+exe+`" -autostart` {
+		if err := setAutostart(true); err != nil {
+			log.Printf("автозапуск: %v", err)
+		}
 	}
 }
 

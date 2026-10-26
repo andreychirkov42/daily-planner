@@ -43,7 +43,8 @@ if ($running) {
     Start-Sleep -Milliseconds 800
 }
 
-Step "Сборка exe" { go build -ldflags "-H windowsgui -s -w" -o $exe . }
+# без -s -w: «обрезанные» Go-программы антивирусы чаще принимают за вредоносные
+Step "Сборка exe" { go build -trimpath -ldflags "-H windowsgui" -o $exe . }
 
 if ($running) {
     Start-Process -FilePath $exe -ArgumentList "-autostart" -WorkingDirectory $PSScriptRoot
