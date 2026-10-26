@@ -47,6 +47,7 @@ var (
 	pSendMessage                   = user32.NewProc("SendMessageW")
 	pCallWindowProc                = user32.NewProc("CallWindowProcW")
 	pIsIconic                      = user32.NewProc("IsIconic")
+	pIsZoomed                      = user32.NewProc("IsZoomed")
 	pExtractIconEx                 = windows.NewLazySystemDLL("shell32.dll").NewProc("ExtractIconExW")
 	pGetCursorPos                  = user32.NewProc("GetCursorPos")
 	pMonitorFromPoint              = user32.NewProc("MonitorFromPoint")
@@ -57,29 +58,34 @@ var (
 )
 
 const (
-	gwlStyle        = ^uintptr(15) // -16
-	gwlExStyle      = ^uintptr(19) // -20
-	hwndTopmost     = ^uintptr(0)  // -1
-	wsPopup         = 0x80000000
-	wsClipChildren  = 0x02000000
-	wsExToolWindow  = 0x00000080
-	wsExTopmost     = 0x00000008
-	swHide          = 0
-	swpShowWindow   = 0x0040
-	swpFrameChanged = 0x0020
-	wmSize          = 0x0005
-	wmClose         = 0x0010
-	wmSetIcon       = 0x0080
-	gwlpWndProc     = ^uintptr(3) // -4
-	swShow          = 5
-	swRestore       = 9
-	swpNoActivate   = 0x0010
-	dwmCornerPref   = 33
-	dwmUseDarkMode  = 20
-	dwmBorderColor  = 34
-	dwmCaptionColor = 35
-	dwmTextColor    = 36
-	dwmRound        = 2
+	gwlStyle          = ^uintptr(15) // -16
+	gwlExStyle        = ^uintptr(19) // -20
+	hwndTopmost       = ^uintptr(0)  // -1
+	wsPopup           = 0x80000000
+	wsClipChildren    = 0x02000000
+	wsExToolWindow    = 0x00000080
+	wsExTopmost       = 0x00000008
+	swHide            = 0
+	swpShowWindow     = 0x0040
+	swpFrameChanged   = 0x0020
+	wmSize            = 0x0005
+	wmClose           = 0x0010
+	wmSysCommand      = 0x0112
+	wmNCLButtonDblClk = 0x00A3
+	htSysMenu         = 3
+	scMaximize        = 0xF030
+	scRestore         = 0xF120
+	wmSetIcon         = 0x0080
+	gwlpWndProc       = ^uintptr(3) // -4
+	swShow            = 5
+	swRestore         = 9
+	swpNoActivate     = 0x0010
+	dwmCornerPref     = 33
+	dwmUseDarkMode    = 20
+	dwmBorderColor    = 34
+	dwmCaptionColor   = 35
+	dwmTextColor      = 36
+	dwmRound          = 2
 )
 
 type point struct{ X, Y int32 }
@@ -336,6 +342,16 @@ var (
 func mainWndProc(hwnd, msg, wp, lp uintptr) uintptr {
 	if msg == wmClose && hwnd == mainHwnd {
 		pShowWindow.Call(hwnd, swHide)
+		return 0
+	}
+	// Двойной клик по значку в заголовке Windows по умолчанию закрывает окно;
+	// значок стоит вплотную к названию, поэтому делаем как у заголовка — развернуть/вернуть.
+	if msg == wmNCLButtonDblClk && wp == htSysMenu && hwnd == mainHwnd {
+		cmd := uintptr(scMaximize)
+		if r, _, _ := pIsZoomed.Call(hwnd); r != 0 {
+			cmd = scRestore
+		}
+		pSendMessage.Call(hwnd, wmSysCommand, cmd, 0)
 		return 0
 	}
 	r, _, _ := pCallWindowProc.Call(mainOldProc, hwnd, msg, wp, lp)
