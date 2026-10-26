@@ -459,7 +459,6 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-w
 @keyframes toast-time { to { transform: scaleX(0); } }
 .toast.t-error { --tc: var(--danger); }
 .toast.t-delete { --tc: var(--p1); --ta: var(--accent); }
-.toast.t-update { --tc: var(--accent-2); }
 .toast.t-deadline { --tc: var(--warn); }
 .toast.t-done { --tc: var(--ok); }
 
