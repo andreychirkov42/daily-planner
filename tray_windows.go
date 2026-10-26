@@ -49,6 +49,7 @@ var (
 	pIsIconic                      = user32.NewProc("IsIconic")
 	pIsZoomed                      = user32.NewProc("IsZoomed")
 	pExtractIconEx                 = windows.NewLazySystemDLL("shell32.dll").NewProc("ExtractIconExW")
+	pSHAppBarMessage               = windows.NewLazySystemDLL("shell32.dll").NewProc("SHAppBarMessage")
 	pGetCursorPos                  = user32.NewProc("GetCursorPos")
 	pMonitorFromPoint              = user32.NewProc("MonitorFromPoint")
 	pGetMonitorInfo                = user32.NewProc("GetMonitorInfoW")
@@ -268,15 +269,24 @@ func (p *popup) place(pt point, passive bool) {
 	pGetMonitorInfo.Call(mon, uintptr(unsafe.Pointer(&mi)))
 
 	scale := monitorScale(mon)
-	w, h, m := int32(popupW*scale), int32(popupH*scale), int32(12*scale)
+	// m — отступ от краёв экрана, gap — от панели задач (как у других панелей в трее)
+	w, h, m, gap := int32(popupW*scale), int32(popupH*scale), int32(12*scale), int32(20*scale)
 	wa := mi.Work
-	if h > wa.Bottom-wa.Top-2*m {
-		h = wa.Bottom - wa.Top - 2*m
+	// автоскрываемая панель задач не уменьшает рабочую область — берём её настоящее место
+	if tb, ok := taskbarRect(); ok && tb.Left < mi.Monitor.Right && tb.Right > mi.Monitor.Left {
+		if tb.Bottom >= mi.Monitor.Bottom-2 && tb.Top > mi.Monitor.Top && tb.Top < wa.Bottom {
+			wa.Bottom = tb.Top // снизу
+		} else if tb.Top <= mi.Monitor.Top+2 && tb.Bottom < mi.Monitor.Bottom && tb.Bottom > wa.Top {
+			wa.Top = tb.Bottom // сверху
+		}
+	}
+	if h > wa.Bottom-wa.Top-m-gap {
+		h = wa.Bottom - wa.Top - m - gap
 	}
 	x := min(max(pt.X-w/2, wa.Left+m), wa.Right-w-m)
-	y := wa.Bottom - h - m
+	y := wa.Bottom - h - gap
 	if pt.Y < wa.Top { // панель задач сверху
-		y = wa.Top + m
+		y = wa.Top + gap
 	}
 	flags := uintptr(swpShowWindow | swpFrameChanged)
 	if passive {
@@ -293,6 +303,23 @@ func (p *popup) place(pt point, passive bool) {
 	p.visible.Store(true)
 	p.shownAt.Store(time.Now().UnixMilli())
 	p.wv.Eval("window.onPopupShow && onPopupShow()")
+}
+
+// taskbarRect — где панель задач, когда она показана (в том числе автоскрываемая).
+func taskbarRect() (rect, bool) {
+	var abd struct {
+		Size     uint32
+		Hwnd     uintptr
+		Callback uint32
+		Edge     uint32
+		Rc       rect
+		LParam   uintptr
+	}
+	abd.Size = uint32(unsafe.Sizeof(abd))
+	if r, _, _ := pSHAppBarMessage.Call(5, uintptr(unsafe.Pointer(&abd))); r == 0 { // ABM_GETTASKBARPOS
+		return rect{}, false
+	}
+	return abd.Rc, true
 }
 
 func monitorScale(mon uintptr) float64 {
